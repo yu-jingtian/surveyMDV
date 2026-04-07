@@ -157,8 +157,8 @@ plot_policy_heatgrid <- function(years,
 #'
 #' @param year A single integer year.
 #' @param policy_x,policy_y Policy variable names. You may pass base names
-#'   (e.g. \code{"guns_pred"}) or suffixed RF names (e.g. \code{"guns_pred_rf"});
-#'   base names will be converted to \code{*_rf}.
+#'   (e.g. \code{"guns"}, \code{"guns_pred"}) or RF names (e.g. \code{"guns_rf"}, \code{"guns_pred_rf"});
+#'   all of these are normalized to the package column names like \code{"guns_rf"}.
 #' @param panel Optional single panel specification list with elements \code{label}
 #'   and \code{filter}. Use \code{NULL} (default) for the whole population.
 #' @param breaks Numeric breaks used for RF binning. Default is \code{seq(0, 1, by = 0.05)}.
@@ -198,7 +198,7 @@ plot_policy_heat_single_rf <- function(year,
   if (is.null(title)) {
     title <- paste0(year, " - ", panel_label)
   }
-  subtitle <- paste0(policy_vec[1], " vs ", policy_vec[2])
+  subtitle <- paste0(sub("_rf$", "", policy_vec[1]), " vs ", sub("_rf$", "", policy_vec[2]))
 
   .draw_single_rf_heatmap_with_marginals(
     df = df,

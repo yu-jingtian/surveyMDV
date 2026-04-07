@@ -9,10 +9,15 @@
   type <- match.arg(type, c("raw", "rf"))
   if (type == "raw") return(c(policy_x, policy_y))
 
-  # rf: accept either base names (e.g., "abortion") or already-suffixed (e.g., "abortion_rf")
-  px <- if (grepl("_rf$", policy_x)) policy_x else paste0(policy_x, "_rf")
-  py <- if (grepl("_rf$", policy_y)) policy_y else paste0(policy_y, "_rf")
-  c(px, py)
+  normalize_one <- function(x) {
+    x <- as.character(x)
+    x <- sub("_pred_rf$", "", x)
+    x <- sub("_pred$", "", x)
+    x <- sub("_rf$", "", x)
+    paste0(x, "_rf")
+  }
+
+  c(normalize_one(policy_x), normalize_one(policy_y))
 }
 
 .check_required_cols <- function(df, cols, context = "") {
