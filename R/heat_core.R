@@ -335,11 +335,6 @@
 
 # ---- single RF heatmap + marginals ----
 
-.format_break_labels <- function(breaks) {
-  mids <- (breaks[-1] + breaks[-length(breaks)]) / 2
-  format(round(mids, 2), nsmall = 2, trim = TRUE)
-}
-
 .single_rf_counts <- function(df, policy_vec, breaks = seq(0, 1, by = 0.05)) {
   .check_required_cols(df, policy_vec, context = "single RF heatmap")
 
@@ -374,6 +369,20 @@
   )
 }
 
+.hist_density_df <- function(z, breaks) {
+  h <- graphics::hist(z, breaks = breaks, plot = FALSE, include.lowest = TRUE, right = TRUE)
+  data.frame(
+    mid = h$mids,
+    density = h$density,
+    width = diff(h$breaks)
+  )
+}
+
+.kde_df <- function(z, rng) {
+  d <- stats::density(z, from = rng[1], to = rng[2], na.rm = TRUE, cut = 0)
+  data.frame(score = d$x, density = d$y)
+}
+
 .draw_single_rf_heatmap_with_marginals <- function(df,
                                                    policy_vec,
                                                    breaks = seq(0, 1, by = 0.05),
@@ -395,11 +404,17 @@
   max_freq <- max(heat_df$Freq, na.rm = TRUE)
   x_lab <- .pretty_policy_label(policy_vec[1])
   y_lab <- .pretty_policy_label(policy_vec[2])
-  rng <- range(breaks)
+  rng <- c(0, 1)
   bin_w <- counts$bin_w
 
+  hist_x <- .hist_density_df(counts$x, breaks = breaks)
+  hist_y <- .hist_density_df(counts$y, breaks = breaks)
+  dens_x <- .kde_df(counts$x, rng = rng)
+  dens_y <- .kde_df(counts$y, rng = rng)
+  ymax <- max(c(hist_x$density, hist_y$density, dens_x$density, dens_y$density), na.rm = TRUE)
+
   p_heat <- ggplot2::ggplot(heat_df, ggplot2::aes(x = x_mid, y = y_mid, fill = Freq)) +
-    ggplot2::geom_tile(width = bin_w, height = bin_w, color = "white", linewidth = 0.2) +
+    ggplot2::geom_tile(width = bin_w, height = bin_w, color = "white", size = 0.2) +
     ggplot2::scale_fill_gradient2(
       midpoint = 0.5 * max_freq,
       limits   = c(0, max_freq),
@@ -408,6 +423,7 @@
     ) +
     ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
     ggplot2::scale_y_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::coord_equal() +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid = ggplot2::element_blank(),
@@ -417,74 +433,74 @@
       plot.title.position = "plot",
       plot.margin = ggplot2::margin(5.5, 5.5, 0, 0)
     ) +
-    ggplot2::labs(
-      title = title,
-      subtitle = subtitle
-    ) +
-    ggplot2::coord_equal()
+    ggplot2::labs(title = title, subtitle = subtitle)
 
-  p_left <- ggplot2::ggplot(df, ggplot2::aes(x = y)) +
-    ggplot2::geom_histogram(
-      ggplot2::aes(y = ..density..),
-      breaks = breaks,
-      fill = "grey70",
+  p_left <- ggplot2::ggplot() +
+    ggplot2::geom_col(
+      data = hist_y,
+      mapping = ggplot2::aes(x = density, y = mid),
+      width = bin_w,
+      fill = "grey75",
       color = "grey35",
-      linewidth = 0.3
+      size = 0.3
     ) +
-    ggplot2::geom_density(linewidth = 0.6, na.rm = TRUE) +
-    ggplot2::coord_flip() +
-    ggplot2::scale_x_continuous(
-      limits = c(0, 1),
-      expand = c(0, 0)
+    ggplot2::geom_line(
+      data = dens_y,
+      mapping = ggplot2::aes(x = density, y = score),
+      size = 0.6,
+      na.rm = TRUE
     ) +
-    ggplot2::labs(x = NULL, y = y_lab) +
+    ggplot2::scale_y_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::scale_x_reverse(limits = c(ymax, 0), expand = c(0, 0)) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid.minor = ggplot2::element_blank(),
       panel.grid.major.y = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_blank(),
-      axis.ticks.x = ggplot2::element_blank(),
-      plot.margin = ggplot2::margin(t = 5.5, r = 5.5, b = 0, l = 5.5)
-    )
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      axis.title.x = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(5.5, 0, 0, 5.5)
+    ) +
+    ggplot2::labs(x = NULL, y = y_lab)
 
-  p_bottom <- ggplot2::ggplot(df, ggplot2::aes(x = x)) +
-    ggplot2::geom_histogram(
-      ggplot2::aes(y = ..density..),
-      breaks = breaks,
-      fill = "grey70",
+  p_bottom <- ggplot2::ggplot() +
+    ggplot2::geom_col(
+      data = hist_x,
+      mapping = ggplot2::aes(x = mid, y = density),
+      width = bin_w,
+      fill = "grey75",
       color = "grey35",
-      linewidth = 0.3
+      size = 0.3
     ) +
-    ggplot2::geom_density(linewidth = 0.6, na.rm = TRUE) +
-    ggplot2::scale_x_continuous(
-      limits = c(0, 1),
-      expand = c(0, 0)
+    ggplot2::geom_line(
+      data = dens_x,
+      mapping = ggplot2::aes(x = score, y = density),
+      size = 0.6,
+      na.rm = TRUE
     ) +
-    ggplot2::scale_y_reverse() +
-    ggplot2::labs(x = x_lab, y = NULL) +
+    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::scale_y_reverse(limits = c(ymax, 0), expand = c(0, 0)) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid.minor = ggplot2::element_blank(),
       panel.grid.major.x = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_blank(),
-      axis.ticks.y = ggplot2::element_blank(),
-      plot.margin = ggplot2::margin(t = 0, r = 5.5, b = 5.5, l = 5.5)
-    )
+      axis.text.x = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(0, 5.5, 5.5, 0)
+    ) +
+    ggplot2::labs(x = x_lab, y = NULL)
 
-    p_comb <- patchwork::wrap_plots(
+  p_comb <- patchwork::wrap_plots(
     patchwork::plot_spacer(), p_heat,
     p_left, p_bottom,
     ncol = 2,
-    widths = c(1.15, 4),
-    heights = c(4, 1.15),
+    widths = c(1.25, 4),
+    heights = c(4, 1.25),
     guides = "collect"
   )
 
-  p_comb <- p_comb + patchwork::plot_annotation(
-    theme = ggplot2::theme(
-      legend.position = "right"
-    )
+  p_comb + patchwork::plot_annotation(
+    theme = ggplot2::theme(legend.position = "right")
   )
-
-  p_comb
 }
