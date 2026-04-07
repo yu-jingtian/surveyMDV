@@ -72,7 +72,7 @@
     welfare = "Welfare"
   )
 
-  if (!is.na(lab_map[key])) return(unname(lab_map[key]))
+  if (key %in% names(lab_map)) return(unname(lab_map[[key]]))
 
   parts <- strsplit(gsub("_+", " ", key), " ")[[1]]
   parts <- parts[nzchar(parts)]
@@ -333,6 +333,7 @@
   else              .draw_panel_raw(df, policy_vec, scale_spec)
 }
 
+
 # ---- single RF heatmap + marginals ----
 
 .single_rf_counts <- function(df, policy_vec, breaks = seq(0, 1, by = 0.05)) {
@@ -374,13 +375,14 @@
   data.frame(
     mid = h$mids,
     density = h$density,
-    width = diff(h$breaks)
+    width = diff(h$breaks),
+    stringsAsFactors = FALSE
   )
 }
 
 .kde_df <- function(z, rng) {
   d <- stats::density(z, from = rng[1], to = rng[2], na.rm = TRUE, cut = 0)
-  data.frame(score = d$x, density = d$y)
+  data.frame(score = d$x, density = d$y, stringsAsFactors = FALSE)
 }
 
 .draw_single_rf_heatmap_with_marginals <- function(df,
@@ -413,11 +415,27 @@
   dens_y <- .kde_df(counts$y, rng = rng)
   ymax <- max(c(hist_x$density, hist_y$density, dens_x$density, dens_y$density), na.rm = TRUE)
 
+  # rectangles avoid geom_col stacking/width issues on reversed axes
+  rect_x <- transform(
+    hist_x,
+    xmin = mid - width / 2,
+    xmax = mid + width / 2,
+    ymin = 0,
+    ymax = density
+  )
+  rect_y <- transform(
+    hist_y,
+    xmin = 0,
+    xmax = density,
+    ymin = mid - width / 2,
+    ymax = mid + width / 2
+  )
+
   p_heat <- ggplot2::ggplot(heat_df, ggplot2::aes(x = x_mid, y = y_mid, fill = Freq)) +
-    ggplot2::geom_tile(width = bin_w, height = bin_w, color = "white", size = 0.2) +
+    ggplot2::geom_tile(width = bin_w, height = bin_w, color = "white", linewidth = 0.2) +
     ggplot2::scale_fill_gradient2(
       midpoint = 0.5 * max_freq,
-      limits   = c(0, max_freq),
+      limits = c(0, max_freq),
       low = low, mid = mid, high = high,
       name = "Count"
     ) +
@@ -430,77 +448,71 @@
       axis.text = ggplot2::element_blank(),
       axis.ticks = ggplot2::element_blank(),
       axis.title = ggplot2::element_blank(),
-      plot.title.position = "plot",
+      legend.position = "bottom",
       plot.margin = ggplot2::margin(5.5, 5.5, 0, 0)
-    ) +
-    ggplot2::labs(title = title, subtitle = subtitle)
+    )
 
   p_left <- ggplot2::ggplot() +
-    ggplot2::geom_col(
-      data = hist_y,
-      mapping = ggplot2::aes(x = density, y = mid),
-      width = bin_w,
+    ggplot2::geom_rect(
+      data = rect_y,
+      mapping = ggplot2::aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
       fill = "grey75",
       color = "grey35",
-      size = 0.3
+      linewidth = 0.3
     ) +
     ggplot2::geom_line(
       data = dens_y,
       mapping = ggplot2::aes(x = density, y = score),
-      size = 0.6,
+      linewidth = 0.6,
       na.rm = TRUE
     ) +
-    ggplot2::scale_y_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::scale_y_continuous(limits = rng, expand = c(0, 0), breaks = c(0, 0.5, 1)) +
     ggplot2::scale_x_reverse(limits = c(ymax, 0), expand = c(0, 0)) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid.minor = ggplot2::element_blank(),
       panel.grid.major.y = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_blank(),
-      axis.ticks.y = ggplot2::element_blank(),
+      panel.grid.major.x = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
       axis.title.x = ggplot2::element_blank(),
       plot.margin = ggplot2::margin(5.5, 0, 0, 5.5)
     ) +
     ggplot2::labs(x = NULL, y = y_lab)
 
   p_bottom <- ggplot2::ggplot() +
-    ggplot2::geom_col(
-      data = hist_x,
-      mapping = ggplot2::aes(x = mid, y = density),
-      width = bin_w,
+    ggplot2::geom_rect(
+      data = rect_x,
+      mapping = ggplot2::aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
       fill = "grey75",
       color = "grey35",
-      size = 0.3
+      linewidth = 0.3
     ) +
     ggplot2::geom_line(
       data = dens_x,
       mapping = ggplot2::aes(x = score, y = density),
-      size = 0.6,
+      linewidth = 0.6,
       na.rm = TRUE
     ) +
-    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0), breaks = c(0, 0.5, 1)) +
     ggplot2::scale_y_reverse(limits = c(ymax, 0), expand = c(0, 0)) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid.minor = ggplot2::element_blank(),
       panel.grid.major.x = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_blank(),
-      axis.ticks.x = ggplot2::element_blank(),
+      panel.grid.major.y = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
       axis.title.y = ggplot2::element_blank(),
       plot.margin = ggplot2::margin(0, 5.5, 5.5, 0)
     ) +
     ggplot2::labs(x = x_lab, y = NULL)
 
-  p_comb <- patchwork::wrap_plots(
-    patchwork::plot_spacer(), p_heat,
-    p_left, p_bottom,
-    ncol = 2,
-    widths = c(1.25, 4),
-    heights = c(4, 1.25),
-    guides = "collect"
-  )
+  p_spacer <- patchwork::plot_spacer()
 
-  p_comb + patchwork::plot_annotation(
-    theme = ggplot2::theme(legend.position = "right")
-  )
+  out <- (p_left + p_heat) / (p_spacer + p_bottom) +
+    patchwork::plot_layout(widths = c(1.2, 4), heights = c(4, 1.2)) +
+    patchwork::plot_annotation(title = title)
+
+  out
 }
