@@ -423,56 +423,53 @@
     ) +
     ggplot2::coord_equal()
 
-  p_left <- ggplot2::ggplot(data.frame(score = counts$y), ggplot2::aes(x = score)) +
+  p_left <- ggplot2::ggplot(df, ggplot2::aes(x = y)) +
     ggplot2::geom_histogram(
-      ggplot2::aes(y = after_stat(density)),
+      ggplot2::aes(y = ..density..),
       breaks = breaks,
-      fill = "grey75",
+      fill = "grey70",
       color = "grey35",
       linewidth = 0.3
     ) +
-    ggplot2::geom_density(linewidth = 0.7, na.rm = TRUE) +
-    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::geom_density(linewidth = 0.6, na.rm = TRUE) +
     ggplot2::coord_flip() +
+    ggplot2::scale_x_continuous(
+      limits = c(0, 1),
+      expand = c(0, 0)
+    ) +
+    ggplot2::labs(x = NULL, y = y_lab) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid.minor = ggplot2::element_blank(),
       panel.grid.major.y = ggplot2::element_blank(),
       axis.text.x = ggplot2::element_blank(),
       axis.ticks.x = ggplot2::element_blank(),
-      plot.margin = ggplot2::margin(5.5, 0, 0, 5.5)
-    ) +
-    ggplot2::labs(x = y_lab, y = "Density")
+      plot.margin = ggplot2::margin(t = 5.5, r = 5.5, b = 0, l = 5.5)
+    )
 
-  p_bottom <- ggplot2::ggplot(data.frame(score = counts$x), ggplot2::aes(x = score)) +
+  p_bottom <- ggplot2::ggplot(df, ggplot2::aes(x = x)) +
     ggplot2::geom_histogram(
-      ggplot2::aes(y = after_stat(density)),
+      ggplot2::aes(y = ..density..),
       breaks = breaks,
-      fill = "grey75",
+      fill = "grey70",
       color = "grey35",
       linewidth = 0.3
     ) +
-    ggplot2::geom_density(linewidth = 0.7, na.rm = TRUE) +
-    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::geom_density(linewidth = 0.6, na.rm = TRUE) +
+    ggplot2::scale_x_continuous(
+      limits = c(0, 1),
+      expand = c(0, 0)
+    ) +
     ggplot2::scale_y_reverse() +
+    ggplot2::labs(x = x_lab, y = NULL) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid.minor = ggplot2::element_blank(),
       panel.grid.major.x = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_blank(),
-      axis.ticks.x = ggplot2::element_blank(),
-      plot.margin = ggplot2::margin(0, 5.5, 5.5, 0)
-    ) +
-    ggplot2::labs(x = x_lab, y = "Density")
-
-    p_comb <- patchwork::wrap_plots(
-    patchwork::plot_spacer(), p_heat,
-    p_left, p_bottom,
-    ncol = 2,
-    widths = c(1.15, 4),
-    heights = c(4, 1.15),
-    guides = "collect"
-  )
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(t = 0, r = 5.5, b = 5.5, l = 5.5)
+    )
 
   p_comb <- p_comb + patchwork::plot_annotation(
     theme = ggplot2::theme(
