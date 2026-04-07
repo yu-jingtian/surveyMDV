@@ -471,6 +471,15 @@
       plot.margin = ggplot2::margin(t = 0, r = 5.5, b = 5.5, l = 5.5)
     )
 
+    p_comb <- patchwork::wrap_plots(
+    patchwork::plot_spacer(), p_heat,
+    p_left, p_bottom,
+    ncol = 2,
+    widths = c(1.15, 4),
+    heights = c(4, 1.15),
+    guides = "collect"
+  )
+
   p_comb <- p_comb + patchwork::plot_annotation(
     theme = ggplot2::theme(
       legend.position = "right"
