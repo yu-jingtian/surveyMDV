@@ -299,3 +299,122 @@
   if (type == "rf") .draw_panel_rf(df, policy_vec, scale_spec, breaks = breaks)
   else              .draw_panel_raw(df, policy_vec, scale_spec)
 }
+
+# ---- single RF heatmap + marginals ----
+
+.format_break_labels <- function(breaks) {
+  mids <- (breaks[-1] + breaks[-length(breaks)]) / 2
+  format(round(mids, 2), nsmall = 2, trim = TRUE)
+}
+
+.single_rf_counts <- function(df, policy_vec, breaks = seq(0, 1, by = 0.05)) {
+  .check_required_cols(df, policy_vec, context = "single RF heatmap")
+
+  ok <- .usable_xy(df, policy_vec)
+  if (!any(ok)) return(NULL)
+
+  x <- df[[policy_vec[1]]][ok]
+  y <- df[[policy_vec[2]]][ok]
+
+  x_cut <- cut(x, breaks = breaks, include.lowest = TRUE, right = TRUE)
+  y_cut <- cut(y, breaks = breaks, include.lowest = TRUE, right = TRUE)
+
+  heat <- as.data.frame(table(x_cut, y_cut), stringsAsFactors = FALSE)
+  names(heat) <- c("x_bin", "y_bin", "Freq")
+  heat$x_bin <- factor(heat$x_bin, levels = levels(x_cut), ordered = TRUE)
+  heat$y_bin <- factor(heat$y_bin, levels = levels(y_cut), ordered = TRUE)
+
+  marg_x <- as.data.frame(table(x_cut), stringsAsFactors = FALSE)
+  names(marg_x) <- c("x_bin", "Freq")
+  marg_x$x_bin <- factor(marg_x$x_bin, levels = levels(x_cut), ordered = TRUE)
+
+  marg_y <- as.data.frame(table(y_cut), stringsAsFactors = FALSE)
+  names(marg_y) <- c("y_bin", "Freq")
+  marg_y$y_bin <- factor(marg_y$y_bin, levels = levels(y_cut), ordered = TRUE)
+
+  list(heat = heat, marg_x = marg_x, marg_y = marg_y, n = sum(ok))
+}
+
+.draw_single_rf_heatmap_with_marginals <- function(df,
+                                                   policy_vec,
+                                                   breaks = seq(0, 1, by = 0.05),
+                                                   title = NULL,
+                                                   subtitle = NULL,
+                                                   low = "#c6dbef",
+                                                   mid = "#F4B811",
+                                                   high = "#CC2929") {
+  if (!requireNamespace("patchwork", quietly = TRUE)) {
+    stop("Package 'patchwork' is required. Install it with install.packages('patchwork').", call. = FALSE)
+  }
+
+  counts <- .single_rf_counts(df, policy_vec, breaks = breaks)
+  if (is.null(counts)) {
+    stop("No non-missing observations available for the requested year/panel/policies.", call. = FALSE)
+  }
+
+  labs <- .format_break_labels(breaks)
+  heat_df <- counts$heat
+  mx <- counts$marg_x
+  my <- counts$marg_y
+  max_freq <- max(heat_df$Freq, na.rm = TRUE)
+
+  p_top <- ggplot2::ggplot(mx, ggplot2::aes(x = x_bin, y = Freq)) +
+    ggplot2::geom_col(fill = "grey70", color = "grey35", width = 0.95) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      axis.title.x = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.grid.major.x = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(5.5, 5.5, 0, 5.5)
+    ) +
+    ggplot2::ylab("Count")
+
+  p_right <- ggplot2::ggplot(my, ggplot2::aes(y = y_bin, x = Freq)) +
+    ggplot2::geom_col(fill = "grey70", color = "grey35", width = 0.95) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      axis.title.y = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.grid.major.y = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(0, 5.5, 5.5, 0)
+    ) +
+    ggplot2::xlab("Count")
+
+  p_heat <- ggplot2::ggplot(heat_df, ggplot2::aes(x = x_bin, y = y_bin, fill = Freq)) +
+    ggplot2::geom_tile(color = "white", linewidth = 0.2) +
+    ggplot2::scale_fill_gradient2(
+      midpoint = 0.5 * max_freq,
+      limits   = c(0, max_freq),
+      low = low, mid = mid, high = high,
+      name = "Count"
+    ) +
+    ggplot2::scale_x_discrete(labels = labs, drop = FALSE) +
+    ggplot2::scale_y_discrete(labels = labs, drop = FALSE) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      panel.grid = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+      plot.margin = ggplot2::margin(0, 0, 5.5, 5.5)
+    ) +
+    ggplot2::labs(
+      x = policy_vec[1],
+      y = policy_vec[2],
+      title = title,
+      subtitle = subtitle
+    ) +
+    ggplot2::coord_equal()
+
+  patchwork::wrap_plots(
+    p_top,
+    patchwork::plot_spacer(),
+    p_heat,
+    p_right,
+    ncol = 2,
+    widths = c(4, 1.2),
+    heights = c(1.2, 4)
+  )
+}

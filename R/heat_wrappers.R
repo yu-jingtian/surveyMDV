@@ -145,3 +145,66 @@ plot_policy_heatgrid <- function(years,
       strip.text.y = ggplot2::element_text(size = 8,  face = "bold")
     )
 }
+
+#' Single-year RF heatmap with top/right marginals
+#'
+#' Draws one RF heatmap for a single year and a single population subgroup, with
+#' marginal histograms (binned bar charts) for the x and y scores placed on the top
+#' and right side of the heatmap.
+#'
+#' This function is intentionally RF-only. It is meant as a presentation-style figure
+#' to complement the multi-year heatmap grid.
+#'
+#' @param year A single integer year.
+#' @param policy_x,policy_y Policy variable names. You may pass base names
+#'   (e.g. \code{"guns_pred"}) or suffixed RF names (e.g. \code{"guns_pred_rf"});
+#'   base names will be converted to \code{*_rf}.
+#' @param panel Optional single panel specification list with elements \code{label}
+#'   and \code{filter}. Use \code{NULL} (default) for the whole population.
+#' @param breaks Numeric breaks used for RF binning. Default is \code{seq(0, 1, by = 0.05)}.
+#' @param title Optional custom title. Default uses year and panel label.
+#'
+#' @return A combined \code{ggplot}/patchwork object.
+#' @export
+plot_policy_heat_single_rf <- function(year,
+                                       policy_x,
+                                       policy_y,
+                                       panel = NULL,
+                                       breaks = seq(0, 1, by = 0.05),
+                                       title = NULL) {
+  year <- as.integer(year)
+  if (length(year) != 1 || is.na(year)) {
+    stop("`year` must be a single integer.", call. = FALSE)
+  }
+
+  policy_vec <- .resolve_policy_names("rf", policy_x, policy_y)
+  df <- .prepare_year_df(year, type = "rf")
+
+  if (!is.null(panel)) {
+    if (!is.list(panel) || is.null(panel$filter)) {
+      stop("`panel` must be NULL or a single panel specification with elements `label` and `filter`.", call. = FALSE)
+    }
+    df <- .apply_panel_filter(df, panel)
+    panel_label <- if (!is.null(panel$label)) panel$label else "Custom panel"
+  } else {
+    panel_label <- "Population"
+  }
+
+  .check_required_cols(df, policy_vec, context = "single RF plot")
+  if (all(is.na(df[[policy_vec[1]]])) || all(is.na(df[[policy_vec[2]]]))) {
+    stop("At least one requested RF policy column is entirely NA for this year/panel.", call. = FALSE)
+  }
+
+  if (is.null(title)) {
+    title <- paste0(year, " - ", panel_label)
+  }
+  subtitle <- paste0(policy_vec[1], " vs ", policy_vec[2])
+
+  .draw_single_rf_heatmap_with_marginals(
+    df = df,
+    policy_vec = policy_vec,
+    breaks = breaks,
+    title = title,
+    subtitle = subtitle
+  )
+}
