@@ -52,6 +52,34 @@
     ggplot2::coord_equal()
 }
 
+
+.pretty_policy_label <- function(x) {
+  key <- as.character(x)
+  key <- sub("_pred_rf$", "", key)
+  key <- sub("_pred$", "", key)
+  key <- sub("_rf$", "", key)
+
+  lab_map <- c(
+    guns = "Gun control",
+    enviro = "Environment",
+    abortion = "Abortion",
+    immig = "Immigration",
+    gay = "Gay rights",
+    health = "Healthcare",
+    taxes = "Taxes",
+    educ = "Education",
+    race = "Race relations",
+    welfare = "Welfare"
+  )
+
+  if (!is.na(lab_map[key])) return(unname(lab_map[key]))
+
+  parts <- strsplit(gsub("_+", " ", key), " ")[[1]]
+  parts <- parts[nzchar(parts)]
+  parts <- paste0(toupper(substring(parts, 1, 1)), substring(parts, 2))
+  paste(parts, collapse = " ")
+}
+
 # ---- data prep ----
 
 .prepare_year_df <- function(year, type) {
@@ -324,20 +352,26 @@
   x_cut <- cut(x, breaks = breaks, include.lowest = TRUE, right = TRUE)
   y_cut <- cut(y, breaks = breaks, include.lowest = TRUE, right = TRUE)
 
+  x_levels <- levels(x_cut)
+  y_levels <- levels(y_cut)
+  x_mids <- (breaks[-1] + breaks[-length(breaks)]) / 2
+  y_mids <- (breaks[-1] + breaks[-length(breaks)]) / 2
+  bin_w <- diff(breaks)[1]
+
   heat <- as.data.frame(table(x_cut, y_cut), stringsAsFactors = FALSE)
   names(heat) <- c("x_bin", "y_bin", "Freq")
-  heat$x_bin <- factor(heat$x_bin, levels = levels(x_cut), ordered = TRUE)
-  heat$y_bin <- factor(heat$y_bin, levels = levels(y_cut), ordered = TRUE)
+  heat$x_bin <- factor(heat$x_bin, levels = x_levels, ordered = TRUE)
+  heat$y_bin <- factor(heat$y_bin, levels = y_levels, ordered = TRUE)
+  heat$x_mid <- x_mids[match(heat$x_bin, x_levels)]
+  heat$y_mid <- y_mids[match(heat$y_bin, y_levels)]
 
-  marg_x <- as.data.frame(table(x_cut), stringsAsFactors = FALSE)
-  names(marg_x) <- c("x_bin", "Freq")
-  marg_x$x_bin <- factor(marg_x$x_bin, levels = levels(x_cut), ordered = TRUE)
-
-  marg_y <- as.data.frame(table(y_cut), stringsAsFactors = FALSE)
-  names(marg_y) <- c("y_bin", "Freq")
-  marg_y$y_bin <- factor(marg_y$y_bin, levels = levels(y_cut), ordered = TRUE)
-
-  list(heat = heat, marg_x = marg_x, marg_y = marg_y, n = sum(ok))
+  list(
+    heat = heat,
+    x = x,
+    y = y,
+    n = sum(ok),
+    bin_w = bin_w
+  )
 }
 
 .draw_single_rf_heatmap_with_marginals <- function(df,
@@ -357,69 +391,87 @@
     stop("No non-missing observations available for the requested year/panel/policies.", call. = FALSE)
   }
 
-  labs <- .format_break_labels(breaks)
   heat_df <- counts$heat
-  mx <- counts$marg_x
-  my <- counts$marg_y
   max_freq <- max(heat_df$Freq, na.rm = TRUE)
+  x_lab <- .pretty_policy_label(policy_vec[1])
+  y_lab <- .pretty_policy_label(policy_vec[2])
+  rng <- range(breaks)
+  bin_w <- counts$bin_w
 
-  p_top <- ggplot2::ggplot(mx, ggplot2::aes(x = x_bin, y = Freq)) +
-    ggplot2::geom_col(fill = "grey70", color = "grey35", width = 0.95) +
-    ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(
-      axis.title.x = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_blank(),
-      axis.ticks.x = ggplot2::element_blank(),
-      panel.grid.minor = ggplot2::element_blank(),
-      panel.grid.major.x = ggplot2::element_blank(),
-      plot.margin = ggplot2::margin(5.5, 5.5, 0, 5.5)
-    ) +
-    ggplot2::ylab("Count")
-
-  p_right <- ggplot2::ggplot(my, ggplot2::aes(y = y_bin, x = Freq)) +
-    ggplot2::geom_col(fill = "grey70", color = "grey35", width = 0.95) +
-    ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(
-      axis.title.y = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_blank(),
-      axis.ticks.y = ggplot2::element_blank(),
-      panel.grid.minor = ggplot2::element_blank(),
-      panel.grid.major.y = ggplot2::element_blank(),
-      plot.margin = ggplot2::margin(0, 5.5, 5.5, 0)
-    ) +
-    ggplot2::xlab("Count")
-
-  p_heat <- ggplot2::ggplot(heat_df, ggplot2::aes(x = x_bin, y = y_bin, fill = Freq)) +
-    ggplot2::geom_tile(color = "white", linewidth = 0.2) +
+  p_heat <- ggplot2::ggplot(heat_df, ggplot2::aes(x = x_mid, y = y_mid, fill = Freq)) +
+    ggplot2::geom_tile(width = bin_w, height = bin_w, color = "white", linewidth = 0.2) +
     ggplot2::scale_fill_gradient2(
       midpoint = 0.5 * max_freq,
       limits   = c(0, max_freq),
       low = low, mid = mid, high = high,
       name = "Count"
     ) +
-    ggplot2::scale_x_discrete(labels = labs, drop = FALSE) +
-    ggplot2::scale_y_discrete(labels = labs, drop = FALSE) +
+    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::scale_y_continuous(limits = rng, expand = c(0, 0)) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
-      plot.margin = ggplot2::margin(0, 0, 5.5, 5.5)
+      axis.text = ggplot2::element_blank(),
+      axis.ticks = ggplot2::element_blank(),
+      axis.title = ggplot2::element_blank(),
+      plot.title.position = "plot",
+      plot.margin = ggplot2::margin(5.5, 5.5, 0, 0)
     ) +
     ggplot2::labs(
-      x = policy_vec[1],
-      y = policy_vec[2],
       title = title,
       subtitle = subtitle
     ) +
     ggplot2::coord_equal()
 
+  p_left <- ggplot2::ggplot(data.frame(score = counts$y), ggplot2::aes(x = score)) +
+    ggplot2::geom_histogram(
+      ggplot2::aes(y = after_stat(density)),
+      breaks = breaks,
+      fill = "grey75",
+      color = "grey35",
+      linewidth = 0.3
+    ) +
+    ggplot2::geom_density(linewidth = 0.7, na.rm = TRUE) +
+    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::coord_flip() +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.grid.major.y = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(5.5, 0, 0, 5.5)
+    ) +
+    ggplot2::labs(x = y_lab, y = "Density")
+
+  p_bottom <- ggplot2::ggplot(data.frame(score = counts$x), ggplot2::aes(x = score)) +
+    ggplot2::geom_histogram(
+      ggplot2::aes(y = after_stat(density)),
+      breaks = breaks,
+      fill = "grey75",
+      color = "grey35",
+      linewidth = 0.3
+    ) +
+    ggplot2::geom_density(linewidth = 0.7, na.rm = TRUE) +
+    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::scale_y_reverse() +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.grid.major.x = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(0, 5.5, 5.5, 0)
+    ) +
+    ggplot2::labs(x = x_lab, y = "Density")
+
   patchwork::wrap_plots(
-    p_top,
-    patchwork::plot_spacer(),
-    p_heat,
-    p_right,
+    patchwork::plot_spacer(), p_heat,
+    p_left, p_bottom,
     ncol = 2,
-    widths = c(4, 1.2),
-    heights = c(1.2, 4)
-  )
+    widths = c(1.15, 4),
+    heights = c(4, 1.15),
+    guides = "collect"
+  ) &
+    ggplot2::theme(legend.position = "right")
 }

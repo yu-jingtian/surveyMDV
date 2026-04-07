@@ -198,13 +198,11 @@ plot_policy_heat_single_rf <- function(year,
   if (is.null(title)) {
     title <- paste0(year, " - ", panel_label)
   }
-  subtitle <- paste0(sub("_rf$", "", policy_vec[1]), " vs ", sub("_rf$", "", policy_vec[2]))
-
   .draw_single_rf_heatmap_with_marginals(
     df = df,
     policy_vec = policy_vec,
     breaks = breaks,
     title = title,
-    subtitle = subtitle
+    subtitle = NULL
   )
 }
