@@ -17,8 +17,8 @@ plot_policy_heat_single_rf(
 \item{year}{A single integer year.}
 
 \item{policy_x, policy_y}{Policy variable names. You may pass base names
-(e.g. \code{"guns_pred"}) or suffixed RF names (e.g. \code{"guns_pred_rf"});
-base names will be converted to \code{*_rf}.}
+(e.g. \code{"guns"}, \code{"guns_pred"}) or RF names (e.g. \code{"guns_rf"}, \code{"guns_pred_rf"});
+all of these are normalized to the package column names like \code{"guns_rf"}.}
 
 \item{panel}{Optional single panel specification list with elements \code{label}
 and \code{filter}. Use \code{NULL} (default) for the whole population.}
