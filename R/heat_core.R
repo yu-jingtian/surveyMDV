@@ -465,13 +465,20 @@
     ) +
     ggplot2::labs(x = x_lab, y = "Density")
 
-  patchwork::wrap_plots(
+    p_comb <- patchwork::wrap_plots(
     patchwork::plot_spacer(), p_heat,
     p_left, p_bottom,
     ncol = 2,
     widths = c(1.15, 4),
     heights = c(4, 1.15),
     guides = "collect"
-  ) &
-    ggplot2::theme(legend.position = "right")
+  )
+
+  p_comb <- p_comb + patchwork::plot_annotation(
+    theme = ggplot2::theme(
+      legend.position = "right"
+    )
+  )
+
+  p_comb
 }
