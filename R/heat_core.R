@@ -448,13 +448,21 @@
       axis.text = ggplot2::element_blank(),
       axis.ticks = ggplot2::element_blank(),
       axis.title = ggplot2::element_blank(),
-      legend.position = "bottom",
+      legend.position = "none",
       plot.margin = ggplot2::margin(5.5, 5.5, 0, 0)
     )
 
+  rect_y2 <- transform(
+    hist_y,
+    xmin = mid - width / 2,
+    xmax = mid + width / 2,
+    ymin = 0,
+    ymax = density
+  )
+
   p_left <- ggplot2::ggplot() +
     ggplot2::geom_rect(
-      data = rect_y,
+      data = rect_y2,
       mapping = ggplot2::aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
       fill = "grey75",
       color = "grey35",
@@ -462,21 +470,23 @@
     ) +
     ggplot2::geom_line(
       data = dens_y,
-      mapping = ggplot2::aes(x = density, y = score),
+      mapping = ggplot2::aes(x = score, y = density),
       linewidth = 0.6,
       na.rm = TRUE
     ) +
-    ggplot2::scale_y_continuous(limits = rng, expand = c(0, 0), breaks = c(0, 0.5, 1)) +
-    ggplot2::scale_x_reverse(limits = c(ymax, 0), expand = c(0, 0)) +
+    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::scale_y_reverse(limits = c(ymax, 0), expand = c(0, 0)) +
+    ggplot2::coord_flip() +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid.minor = ggplot2::element_blank(),
-      panel.grid.major.y = ggplot2::element_blank(),
       panel.grid.major.x = ggplot2::element_blank(),
+      panel.grid.major.y = ggplot2::element_blank(),
       axis.text.x = ggplot2::element_blank(),
       axis.ticks.x = ggplot2::element_blank(),
-      axis.title.x = ggplot2::element_blank(),
-      plot.margin = ggplot2::margin(5.5, 0, 0, 5.5)
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank()
     ) +
     ggplot2::labs(x = NULL, y = y_lab)
 
@@ -494,24 +504,29 @@
       linewidth = 0.6,
       na.rm = TRUE
     ) +
-    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0), breaks = c(0, 0.5, 1)) +
+    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
     ggplot2::scale_y_reverse(limits = c(ymax, 0), expand = c(0, 0)) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid.minor = ggplot2::element_blank(),
       panel.grid.major.x = ggplot2::element_blank(),
       panel.grid.major.y = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
       axis.text.y = ggplot2::element_blank(),
       axis.ticks.y = ggplot2::element_blank(),
-      axis.title.y = ggplot2::element_blank(),
-      plot.margin = ggplot2::margin(0, 5.5, 5.5, 0)
+      axis.title.y = ggplot2::element_blank()
     ) +
     ggplot2::labs(x = x_lab, y = NULL)
 
   p_spacer <- patchwork::plot_spacer()
 
-  out <- (p_left + p_heat) / (p_spacer + p_bottom) +
-    patchwork::plot_layout(widths = c(1.2, 4), heights = c(4, 1.2)) +
+  out <- (p_left + p_heat + p_spacer) /
+    (p_spacer + p_bottom + p_spacer) +
+    patchwork::plot_layout(
+      widths = c(1.2, 4, 0.2),
+      heights = c(4, 0.9)
+    ) +
     patchwork::plot_annotation(title = title)
 
   out
