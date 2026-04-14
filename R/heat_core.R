@@ -1,5 +1,5 @@
 # R/heat_core.R
-# Internal (non-exported) helpers for data prep, scaling, and drawing single panels.
+# Internal (non-exported) helpers for data prep, scaling, and drawing panels.
 
 # ---- utilities ----
 
@@ -52,32 +52,26 @@
     ggplot2::coord_equal()
 }
 
-
 .pretty_policy_label <- function(x) {
-  key <- as.character(x)
-  key <- sub("_pred_rf$", "", key)
-  key <- sub("_pred$", "", key)
-  key <- sub("_rf$", "", key)
+  x0 <- gsub("_pred_rf$|_pred$|_rf$", "", x)
 
   lab_map <- c(
     guns = "Gun control",
     enviro = "Environment",
+    environment = "Environment",
     abortion = "Abortion",
     immig = "Immigration",
-    gay = "Gay rights",
-    health = "Healthcare",
-    taxes = "Taxes",
-    educ = "Education",
-    race = "Race relations",
-    welfare = "Welfare"
+    immigration = "Immigration",
+    healthcare = "Healthcare",
+    military = "Military",
+    spending = "Spending",
+    trade = "Trade"
   )
 
-  if (key %in% names(lab_map)) return(unname(lab_map[[key]]))
+  if (x0 %in% names(lab_map)) return(unname(lab_map[[x0]]))
 
-  parts <- strsplit(gsub("_+", " ", key), " ")[[1]]
-  parts <- parts[nzchar(parts)]
-  parts <- paste0(toupper(substring(parts, 1, 1)), substring(parts, 2))
-  paste(parts, collapse = " ")
+  x0 <- gsub("_", " ", x0)
+  paste0(toupper(substr(x0, 1, 1)), substr(x0, 2, nchar(x0)))
 }
 
 # ---- data prep ----
@@ -93,7 +87,6 @@
   }
   demo <- get_demographics(year = year, cols = NULL)
 
-  # base join (keeps package lightweight; no need for dplyr here)
   merge(pol, demo, by = c("case_id", "year"), all = FALSE)
 }
 
@@ -102,9 +95,92 @@
   panel$filter(df)
 }
 
+
+.panel_label <- function(panel) {
+  if (is.null(panel)) return("Population")
+
+  one_label <- function(p) {
+    if (is.list(p) && !is.null(p$label)) return(as.character(p$label))
+    "Custom panel"
+  }
+
+  if (!is.null(panel$filter)) return(one_label(panel))
+
+  if (is.list(panel)) {
+    labs <- vapply(panel, one_label, character(1))
+    labs <- labs[nzchar(labs)]
+    if (length(labs) == 0) return("Custom panel")
+    return(paste(labs, collapse = " "))
+  }
+
+  "Custom panel"
+}
+
+.resolve_single_subgroup_filter <- function(subgroup) {
+  if (is.null(subgroup)) {
+    return(list(label = "Population", filter = function(df) df))
+  }
+
+  key <- trimws(as.character(subgroup))
+  key_low <- tolower(key)
+
+  if (key_low %in% c("population", "all", "overall")) {
+    return(list(label = "Population", filter = function(df) df))
+  }
+  if (key_low %in% c("rep", "rep.", "republican", "republicans")) {
+    return(list(label = "Rep.", filter = function(df) df[df$partisan == "Rep.", , drop = FALSE]))
+  }
+  if (key_low %in% c("dem", "dem.", "democrat", "democrats")) {
+    return(list(label = "Dem.", filter = function(df) df[df$partisan == "Dem.", , drop = FALSE]))
+  }
+  if (key_low %in% c("ind", "ind.", "independent", "independents")) {
+    return(list(label = "Ind.", filter = function(df) df[df$partisan == "Ind.", , drop = FALSE]))
+  }
+  if (key_low %in% c("college", "college+", "college educated")) {
+    return(list(label = "College", filter = function(df) df[df$educ %in% c(4, 5, 6), , drop = FALSE]))
+  }
+  if (key_low %in% c("non-college", "noncollege", "no college")) {
+    return(list(label = "Non-college", filter = function(df) df[df$educ %in% c(1, 2, 3), , drop = FALSE]))
+  }
+  if (key_low %in% c("metro", "big metro", "urban")) {
+    return(list(label = "Big Metro", filter = function(df) df[df$rural_urban %in% c(1), , drop = FALSE]))
+  }
+  if (key_low %in% c("non-metro", "nonmetro", "other co.", "other county", "rural")) {
+    return(list(label = "Other Co.", filter = function(df) df[df$rural_urban %in% c(2,3,4,5,6,7,8,9), , drop = FALSE]))
+  }
+  if (key_low %in% c("female", "woman", "women")) {
+    return(list(label = "Female", filter = function(df) df[.gender_is_female(df$gender), , drop = FALSE]))
+  }
+  if (key_low %in% c("male", "man", "men")) {
+    return(list(label = "Male", filter = function(df) df[.gender_is_male(df$gender), , drop = FALSE]))
+  }
+
+  stop(
+    "Unknown subgroup: ", subgroup,
+    ". Supported values include 'Rep.', 'Dem.', 'Ind.', 'college', 'non-college', 'metro', 'non-metro', 'female', 'male'.",
+    call. = FALSE
+  )
+}
+
+.resolve_subgroup_filters <- function(subgroup1 = NULL, subgroup2 = NULL) {
+  s1 <- .resolve_single_subgroup_filter(subgroup1)
+
+  if (is.null(subgroup2)) {
+    return(list(label = s1$label, filter = s1$filter))
+  }
+
+  s2 <- .resolve_single_subgroup_filter(subgroup2)
+
+  list(
+    label = paste(s1$label, s2$label),
+    filter = function(df) {
+      out <- s1$filter(df)
+      s2$filter(out)
+    }
+  )
+}
+
 # ---- scaling ----
-# scale specs always computed from the REFERENCE dataset only (population or a chosen panel),
-# then re-used for all subgroup panels.
 
 .compute_scale_spec_rf <- function(df, policy_vec, breaks = seq(0, 1, by = 0.05)) {
   .check_required_cols(df, policy_vec, context = "RF scaling")
@@ -112,7 +188,6 @@
   x <- df[[policy_vec[1]]]
   y <- df[[policy_vec[2]]]
 
-  # structural missing for the reference
   if (all(is.na(x)) || all(is.na(y))) {
     return(list(max_freq = NA_integer_, total = 0L, empty = TRUE))
   }
@@ -124,7 +199,6 @@
 
   x_cut <- cut(x[ok], breaks = breaks, include.lowest = TRUE, right = TRUE)
   y_cut <- cut(y[ok], breaks = breaks, include.lowest = TRUE, right = TRUE)
-
   ft <- as.data.frame(table(x_cut, y_cut))
 
   list(
@@ -151,7 +225,6 @@
 
   fx <- factor(x[ok])
   fy <- factor(y[ok])
-
   ft <- as.data.frame(table(fx, fy))
 
   list(
@@ -179,7 +252,7 @@
 
   compute_one <- function(df) {
     if (type == "rf") .compute_scale_spec_rf(df, policy_vec, breaks = breaks)
-    else             .compute_scale_spec_raw(df, policy_vec)
+    else               .compute_scale_spec_raw(df, policy_vec)
   }
 
   get_ref_df <- function(df_year) {
@@ -192,7 +265,6 @@
   }
 
   if (scale == "within_year") {
-    # One reference-derived scale per YEAR, reused for all subgroup panels in that year
     for (c in seq_len(n_years)) {
       ref_df   <- get_ref_df(df_year_list[[c]])
       ref_spec <- compute_one(ref_df)
@@ -201,9 +273,6 @@
     return(specs)
   }
 
-  # across_years (FIXED):
-  # Compute the reference scale per year, then take the max across years.
-  # Do NOT pool rows across years (that inflates counts and washes out colors).
   ref_specs_by_year <- vector("list", n_years)
   for (c in seq_len(n_years)) {
     ref_df <- get_ref_df(df_year_list[[c]])
@@ -211,7 +280,6 @@
     ref_specs_by_year[[c]] <- compute_one(ref_df)
   }
 
-  # Keep only non-empty years
   nonempty <- vapply(ref_specs_by_year, function(s) !is.null(s$empty) && !isTRUE(s$empty), logical(1))
   if (!any(nonempty)) {
     global_spec <- list(max_freq = NA_integer_, total = 0L, empty = TRUE)
@@ -221,21 +289,17 @@
 
     global_spec <- list(
       max_freq = as.integer(max(max_freqs, na.rm = TRUE)),
-      # For RF tiles, total isn't used; for raw points, this keeps sizing stable.
-      # Using max(total) is a safe cross-year reference (avoids pooled inflation).
       total    = as.integer(max(totals, na.rm = TRUE)),
       empty    = FALSE
     )
   }
 
-  # Reuse the same global spec for every panel-row and year-column
   for (c in seq_len(n_years)) {
     for (r in seq_len(n_panels)) specs[[r]][[c]] <- global_spec
   }
 
   specs
 }
-
 
 # ---- panel drawing ----
 
@@ -244,7 +308,6 @@
                            low = "#c6dbef", mid = "#F4B811", high = "#CC2929") {
   .check_required_cols(df, policy_vec, context = "RF panel drawing")
 
-  # subgroup may be empty even if year is valid
   ok <- .usable_xy(df, policy_vec)
   if (!any(ok)) return(.blank_panel())
 
@@ -330,7 +393,7 @@
 .draw_panel <- function(df, type, policy_vec, scale_spec, breaks = seq(0, 1, by = 0.05)) {
   type <- match.arg(type, c("raw", "rf"))
   if (type == "rf") .draw_panel_rf(df, policy_vec, scale_spec, breaks = breaks)
-  else              .draw_panel_raw(df, policy_vec, scale_spec)
+  else                .draw_panel_raw(df, policy_vec, scale_spec)
 }
 
 
@@ -370,21 +433,6 @@
   )
 }
 
-.hist_density_df <- function(z, breaks) {
-  h <- graphics::hist(z, breaks = breaks, plot = FALSE, include.lowest = TRUE, right = TRUE)
-  data.frame(
-    mid = h$mids,
-    density = h$density,
-    width = diff(h$breaks),
-    stringsAsFactors = FALSE
-  )
-}
-
-.kde_df <- function(z, rng) {
-  d <- stats::density(z, from = rng[1], to = rng[2], na.rm = TRUE, cut = 0)
-  data.frame(score = d$x, density = d$y, stringsAsFactors = FALSE)
-}
-
 .draw_single_rf_heatmap_with_marginals <- function(df,
                                                    policy_vec,
                                                    breaks = seq(0, 1, by = 0.05),
@@ -393,8 +441,11 @@
                                                    low = "#c6dbef",
                                                    mid = "#F4B811",
                                                    high = "#CC2929") {
-  if (!requireNamespace("patchwork", quietly = TRUE)) {
-    stop("Package 'patchwork' is required. Install it with install.packages('patchwork').", call. = FALSE)
+  if (!requireNamespace("gridExtra", quietly = TRUE)) {
+    stop("Package 'gridExtra' is required. Install it with install.packages('gridExtra').", call. = FALSE)
+  }
+  if (!requireNamespace("grid", quietly = TRUE)) {
+    stop("Package 'grid' is required.", call. = FALSE)
   }
 
   counts <- .single_rf_counts(df, policy_vec, breaks = breaks)
@@ -404,44 +455,79 @@
 
   heat_df <- counts$heat
   max_freq <- max(heat_df$Freq, na.rm = TRUE)
+  if (!is.finite(max_freq) || max_freq <= 0) max_freq <- 1
+
   x_lab <- .pretty_policy_label(policy_vec[1])
   y_lab <- .pretty_policy_label(policy_vec[2])
   rng <- c(0, 1)
   bin_w <- counts$bin_w
 
-  hist_x <- .hist_density_df(counts$x, breaks = breaks)
-  hist_y <- .hist_density_df(counts$y, breaks = breaks)
-  dens_x <- .kde_df(counts$x, rng = rng)
-  dens_y <- .kde_df(counts$y, rng = rng)
-  ymax <- max(c(hist_x$density, hist_y$density, dens_x$density, dens_y$density), na.rm = TRUE)
+  plot_dist_hist <- function(z, lab = NULL, rng = c(0, 1), side = c("bottom", "left")) {
+    side <- match.arg(side, c("bottom", "left"))
+    dfz <- data.frame(z = z)
 
-  # rectangles avoid geom_col stacking/width issues on reversed axes
-  rect_x <- transform(
-    hist_x,
-    xmin = mid - width / 2,
-    xmax = mid + width / 2,
-    ymin = 0,
-    ymax = density
-  )
-  rect_y <- transform(
-    hist_y,
-    xmin = 0,
-    xmax = density,
-    ymin = mid - width / 2,
-    ymax = mid + width / 2
-  )
+    p <- ggplot2::ggplot(dfz, ggplot2::aes(x = z)) +
+      ggplot2::geom_histogram(
+        ggplot2::aes(y = after_stat(density)),
+        breaks = breaks,
+        fill = "ivory4",
+        color = "grey35",
+        linewidth = 0.3
+      ) +
+      ggplot2::geom_density(
+        color = "black",
+        linewidth = 0.8,
+        adjust = 1
+      ) +
+      ggplot2::scale_x_continuous(
+        limits = rng,
+        expand = c(0, 0)
+      ) +
+      ggplot2::theme_minimal(base_size = 11) +
+      ggplot2::theme(
+        legend.position = "none",
+        panel.border = ggplot2::element_blank(),
+        panel.grid.major = ggplot2::element_blank(),
+        panel.grid.minor = ggplot2::element_blank(),
+        axis.line = ggplot2::element_blank(),
+        panel.background = ggplot2::element_blank(),
+        axis.text = ggplot2::element_blank(),
+        axis.ticks = ggplot2::element_blank()
+      )
+
+    if (side == "bottom") {
+      p <- p +
+        ggplot2::scale_y_reverse(expand = c(0, 0)) +
+        ggplot2::labs(x = lab, y = NULL) +
+        ggplot2::theme(
+          axis.title.x = ggplot2::element_text(size = 16),
+          axis.title.y = ggplot2::element_blank(),
+          plot.margin = ggplot2::margin(t = 0, r = 5.5, b = 5.5, l = 0)
+        )
+    } else {
+      p <- p +
+        ggplot2::coord_flip() +
+        ggplot2::scale_y_reverse(expand = c(0, 0)) +
+        ggplot2::labs(x = NULL, y = NULL) +
+        ggplot2::theme(
+          axis.title.x = ggplot2::element_blank(),
+          axis.title.y = ggplot2::element_blank(),
+          plot.margin = ggplot2::margin(t = 5.5, r = 0, b = 0, l = 0)
+        )
+    }
+
+    p
+  }
 
   p_heat <- ggplot2::ggplot(heat_df, ggplot2::aes(x = x_mid, y = y_mid, fill = Freq)) +
     ggplot2::geom_tile(width = bin_w, height = bin_w, color = "white", linewidth = 0.2) +
     ggplot2::scale_fill_gradient2(
       midpoint = 0.5 * max_freq,
       limits = c(0, max_freq),
-      low = low, mid = mid, high = high,
-      name = "Count"
+      low = low, mid = mid, high = high
     ) +
     ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
     ggplot2::scale_y_continuous(limits = rng, expand = c(0, 0)) +
-    ggplot2::coord_equal() +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid = ggplot2::element_blank(),
@@ -452,82 +538,43 @@
       plot.margin = ggplot2::margin(5.5, 5.5, 0, 0)
     )
 
-  rect_y2 <- transform(
-    hist_y,
-    xmin = mid - width / 2,
-    xmax = mid + width / 2,
-    ymin = 0,
-    ymax = density
+  p_left <- plot_dist_hist(counts$y, lab = y_lab, rng = rng, side = "left")
+  p_bottom <- plot_dist_hist(counts$x, lab = x_lab, rng = rng, side = "bottom")
+
+  y_lab_grob <- grid::textGrob(
+    y_lab,
+    rot = 90,
+    gp = grid::gpar(fontsize = 16)
   )
 
-  p_left <- ggplot2::ggplot() +
-    ggplot2::geom_rect(
-      data = rect_y2,
-      mapping = ggplot2::aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-      fill = "grey75",
-      color = "grey35",
-      linewidth = 0.3
-    ) +
-    ggplot2::geom_line(
-      data = dens_y,
-      mapping = ggplot2::aes(x = score, y = density),
-      linewidth = 0.6,
-      na.rm = TRUE
-    ) +
-    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
-    ggplot2::scale_y_reverse(limits = c(ymax, 0), expand = c(0, 0)) +
-    ggplot2::coord_flip() +
-    ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(
-      panel.grid.minor = ggplot2::element_blank(),
-      panel.grid.major.x = ggplot2::element_blank(),
-      panel.grid.major.y = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_blank(),
-      axis.ticks.x = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_blank(),
-      axis.ticks.y = ggplot2::element_blank(),
-      axis.title.y = ggplot2::element_blank()
-    ) +
-    ggplot2::labs(x = NULL, y = y_lab)
+  top_grob <- gridExtra::arrangeGrob(
+    grobs = list(y_lab_grob, p_left, p_heat),
+    ncol = 3,
+    widths = c(0.55, 1, 5)
+  )
 
-  p_bottom <- ggplot2::ggplot() +
-    ggplot2::geom_rect(
-      data = rect_x,
-      mapping = ggplot2::aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-      fill = "grey75",
-      color = "grey35",
-      linewidth = 0.3
-    ) +
-    ggplot2::geom_line(
-      data = dens_x,
-      mapping = ggplot2::aes(x = score, y = density),
-      linewidth = 0.6,
-      na.rm = TRUE
-    ) +
-    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
-    ggplot2::scale_y_reverse(limits = c(ymax, 0), expand = c(0, 0)) +
-    ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(
-      panel.grid.minor = ggplot2::element_blank(),
-      panel.grid.major.x = ggplot2::element_blank(),
-      panel.grid.major.y = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_blank(),
-      axis.ticks.x = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_blank(),
-      axis.ticks.y = ggplot2::element_blank(),
-      axis.title.y = ggplot2::element_blank()
-    ) +
-    ggplot2::labs(x = x_lab, y = NULL)
+  bottom_grob <- gridExtra::arrangeGrob(
+    grobs = list(grid::nullGrob(), grid::nullGrob(), p_bottom),
+    ncol = 3,
+    widths = c(0.55, 1, 5)
+  )
 
-  p_spacer <- patchwork::plot_spacer()
+  g <- gridExtra::arrangeGrob(
+    grobs = list(top_grob, bottom_grob),
+    ncol = 1,
+    heights = c(5, 1)
+  )
 
-  out <- (p_left + p_heat + p_spacer) /
-    (p_spacer + p_bottom + p_spacer) +
-    patchwork::plot_layout(
-      widths = c(1.2, 4, 0.2),
-      heights = c(4, 0.9)
-    ) +
-    patchwork::plot_annotation(title = title)
+  if (!is.null(title) && nzchar(title)) {
+    g <- gridExtra::arrangeGrob(
+      g,
+      top = grid::textGrob(
+        label = title,
+        x = 0.02, hjust = 0,
+        gp = grid::gpar(fontsize = 20, fontface = "bold")
+      )
+    )
+  }
 
-  out
+  g
 }

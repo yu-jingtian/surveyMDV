@@ -2,40 +2,40 @@
 % Please edit documentation in R/heat_wrappers.R
 \name{plot_policy_heat_single_rf}
 \alias{plot_policy_heat_single_rf}
-\title{Single-year RF heatmap with top/right marginals}
+\title{Single-year RF heatmap with marginals}
 \usage{
 plot_policy_heat_single_rf(
   year,
   policy_x,
   policy_y,
+  subgroup1 = NULL,
+  subgroup2 = NULL,
   panel = NULL,
   breaks = seq(0, 1, by = 0.05),
   title = NULL
 )
 }
 \arguments{
-\item{year}{A single integer year.}
+\item{year}{Integer year.}
 
-\item{policy_x, policy_y}{Policy variable names. You may pass base names
-(e.g. \code{"guns"}, \code{"guns_pred"}) or RF names (e.g. \code{"guns_rf"}, \code{"guns_pred_rf"});
-all of these are normalized to the package column names like \code{"guns_rf"}.}
+\item{policy_x, policy_y}{RF policy names. You may pass base names
+like "guns" and "enviro", or suffixed names like "guns_rf".}
 
-\item{panel}{Optional single panel specification list with elements \code{label}
-and \code{filter}. Use \code{NULL} (default) for the whole population.}
+\item{subgroup1}{Optional first subgroup label, e.g. "Rep.", "college", "metro".}
 
-\item{breaks}{Numeric breaks used for RF binning. Default is \code{seq(0, 1, by = 0.05)}.}
+\item{subgroup2}{Optional second subgroup label for an interaction, e.g. "Rep." and "college".}
 
-\item{title}{Optional custom title. Default uses year and panel label.}
+\item{panel}{Optional panel specification for backward compatibility. When supplied,
+it overrides \code{subgroup1} and \code{subgroup2}.}
+
+\item{breaks}{RF score bin edges. Default seq(0,1,0.05).}
+
+\item{title}{Optional custom title.}
 }
 \value{
-A combined \code{ggplot}/patchwork object.
+A grid grob.
 }
 \description{
-Draws one RF heatmap for a single year and a single population subgroup, with
-marginal histograms (binned bar charts) for the x and y scores placed on the top
-and right side of the heatmap.
-}
-\details{
-This function is intentionally RF-only. It is meant as a presentation-style figure
-to complement the multi-year heatmap grid.
+Draw a single-year RF heatmap for one policy pair, with a left y-marginal
+and a bottom x-marginal.
 }

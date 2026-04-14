@@ -46,21 +46,14 @@ plot_policy_heatgrid <- function(years,
   years <- as.integer(years)
   if (any(is.na(years))) stop("`years` must be coercible to integer.", call. = FALSE)
 
-  # Resolve policy column names
   policy_vec <- .resolve_policy_names(type, policy_x, policy_y)
-
-  # Load/merge per-year data (initial)
   df_year_list <- lapply(years, function(y) .prepare_year_df(y, type = type))
 
-  # Determine which years are valid (policy exists in that year reference data)
-  # We drop a year if either policy column is ALL NA for that year (population reference).
   drop_reason <- character(0)
   keep <- rep(TRUE, length(years))
 
   for (i in seq_along(years)) {
     df_y <- df_year_list[[i]]
-
-    # if columns are missing entirely, treat as missing
     missing_cols <- setdiff(policy_vec, names(df_y))
     if (length(missing_cols) > 0) {
       keep[i] <- FALSE
@@ -71,7 +64,6 @@ plot_policy_heatgrid <- function(years,
 
     x <- df_y[[policy_vec[1]]]
     y <- df_y[[policy_vec[2]]]
-
     miss_x <- all(is.na(x))
     miss_y <- all(is.na(y))
 
@@ -100,7 +92,6 @@ plot_policy_heatgrid <- function(years,
     stop("All requested years were dropped because at least one policy is missing (all NA).", call. = FALSE)
   }
 
-  # Compute scaling specs from the chosen reference and remaining years only
   scale_specs <- .compute_scale_specs(
     df_year_list     = df_year_list,
     panels           = panels,
@@ -112,7 +103,6 @@ plot_policy_heatgrid <- function(years,
     breaks           = breaks
   )
 
-  # Draw all panels (row-major ordering for ggmatrix)
   n_panels <- length(panels)
   n_years  <- length(years)
   p_list <- vector("list", n_panels * n_years)
@@ -146,29 +136,28 @@ plot_policy_heatgrid <- function(years,
     )
 }
 
-#' Single-year RF heatmap with top/right marginals
+#' Single-year RF heatmap with marginals
 #'
-#' Draws one RF heatmap for a single year and a single population subgroup, with
-#' marginal histograms (binned bar charts) for the x and y scores placed on the top
-#' and right side of the heatmap.
+#' Draw a single-year RF heatmap for one policy pair, with a left y-marginal
+#' and a bottom x-marginal.
 #'
-#' This function is intentionally RF-only. It is meant as a presentation-style figure
-#' to complement the multi-year heatmap grid.
+#' @param year Integer year.
+#' @param policy_x,policy_y RF policy names. You may pass base names
+#'   like "guns" and "enviro", or suffixed names like "guns_rf".
+#' @param subgroup1 Optional first subgroup label, e.g. "Rep.", "college", "metro".
+#' @param subgroup2 Optional second subgroup label for an interaction, e.g. "Rep." and "college".
+#' @param panel Optional panel specification for backward compatibility. When supplied,
+#'   it overrides `subgroup1` and `subgroup2`.
+#' @param breaks RF score bin edges. Default seq(0,1,0.05).
+#' @param title Optional custom title.
 #'
-#' @param year A single integer year.
-#' @param policy_x,policy_y Policy variable names. You may pass base names
-#'   (e.g. \code{"guns"}, \code{"guns_pred"}) or RF names (e.g. \code{"guns_rf"}, \code{"guns_pred_rf"});
-#'   all of these are normalized to the package column names like \code{"guns_rf"}.
-#' @param panel Optional single panel specification list with elements \code{label}
-#'   and \code{filter}. Use \code{NULL} (default) for the whole population.
-#' @param breaks Numeric breaks used for RF binning. Default is \code{seq(0, 1, by = 0.05)}.
-#' @param title Optional custom title. Default uses year and panel label.
-#'
-#' @return A combined \code{ggplot}/patchwork object.
+#' @return A grid grob.
 #' @export
 plot_policy_heat_single_rf <- function(year,
                                        policy_x,
                                        policy_y,
+                                       subgroup1 = NULL,
+                                       subgroup2 = NULL,
                                        panel = NULL,
                                        breaks = seq(0, 1, by = 0.05),
                                        title = NULL) {
@@ -181,16 +170,21 @@ plot_policy_heat_single_rf <- function(year,
   df <- .prepare_year_df(year, type = "rf")
 
   if (!is.null(panel)) {
-    if (!is.list(panel) || is.null(panel$filter)) {
-      stop("`panel` must be NULL or a single panel specification with elements `label` and `filter`.", call. = FALSE)
+    if (!is.list(panel)) {
+      stop("`panel` must be NULL or a panel specification list.", call. = FALSE)
     }
     df <- .apply_panel_filter(df, panel)
-    panel_label <- if (!is.null(panel$label)) panel$label else "Custom panel"
+    panel_label <- .panel_label(panel)
   } else {
-    panel_label <- "Population"
+    subgroup_spec <- .resolve_subgroup_filters(subgroup1, subgroup2)
+    df <- subgroup_spec$filter(df)
+    panel_label <- subgroup_spec$label
   }
 
   .check_required_cols(df, policy_vec, context = "single RF plot")
+  if (nrow(df) == 0) {
+    stop("No observations remain after applying the requested subgroup filter(s).", call. = FALSE)
+  }
   if (all(is.na(df[[policy_vec[1]]])) || all(is.na(df[[policy_vec[2]]]))) {
     stop("At least one requested RF policy column is entirely NA for this year/panel.", call. = FALSE)
   }
@@ -198,6 +192,7 @@ plot_policy_heat_single_rf <- function(year,
   if (is.null(title)) {
     title <- paste0(year, " - ", panel_label)
   }
+
   .draw_single_rf_heatmap_with_marginals(
     df = df,
     policy_vec = policy_vec,
