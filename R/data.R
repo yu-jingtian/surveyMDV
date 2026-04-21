@@ -19,46 +19,42 @@
 #' }
 #'
 #' @details
-#' Join keys are \code{case_id} and \code{year}. Use \code{\link{policy_rf}} for
-#' random-forest predicted scores, and \code{\link{demographics}} for covariates
-#' and survey weights.
-#'
-#' @examples
-#' data("policy_raw", package = "surveyMDV")
-#' head(policy_raw)
+#' Join keys are \code{case_id} and \code{year}. Use \code{\link{policy_rf}},
+#' \code{\link{policy_xbg}}, \code{\link{policy_lm}}, \code{\link{policy_svr}},
+#' and \code{\link{demographics}} for predicted scores and covariates.
 "policy_raw"
-
 
 #' Random-forest predicted policy scores by year (2014–2021)
 #'
-#' A dataset of random-forest (RF) predicted policy preference scores covering
-#' survey years 2014 through 2021 (inclusive). Each row corresponds to one
-#' respondent (identified by \code{case_id}) in one survey \code{year}.
+#' Predicted policy preference scores from the RF model.
 #'
-#' @format A data frame with the following columns:
-#' \describe{
-#'   \item{case_id}{Unique respondent identifier used for merging across datasets.}
-#'   \item{year}{Integer survey year (2014--2021).}
-#'   \item{immig_rf}{RF-predicted immigration policy preference score.}
-#'   \item{enviro_rf}{RF-predicted environment policy preference score.}
-#'   \item{abortion_rf}{RF-predicted abortion policy preference score.}
-#'   \item{guns_rf}{RF-predicted gun policy preference score.}
-#'   \item{healthcare_rf}{RF-predicted healthcare policy preference score.}
-#'   \item{military_rf}{RF-predicted military policy preference score.}
-#'   \item{spending_rf}{RF-predicted government spending policy preference score.}
-#'   \item{trade_rf}{RF-predicted trade policy preference score.}
-#' }
-#'
-#' @details
-#' Predicted scores are produced from a random forest model using respondent
-#' demographics. The sample weight column \code{weight_cumulative} is stored in
-#' \code{\link{demographics}}. Join keys are \code{case_id} and \code{year}.
-#'
-#' @examples
-#' data("policy_rf", package = "surveyMDV")
-#' head(policy_rf)
+#' @format A data frame with \code{case_id}, \code{year}, and policy columns
+#' suffixed with \code{_rf}.
 "policy_rf"
 
+#' XBG predicted policy scores by year (2014–2021)
+#'
+#' Predicted policy preference scores from the XBG model.
+#'
+#' @format A data frame with \code{case_id}, \code{year}, and policy columns
+#' suffixed with \code{_xbg}.
+"policy_xbg"
+
+#' Linear-model predicted policy scores by year (2014–2021)
+#'
+#' Predicted policy preference scores from the linear model.
+#'
+#' @format A data frame with \code{case_id}, \code{year}, and policy columns
+#' suffixed with \code{_lm}.
+"policy_lm"
+
+#' SVR predicted policy scores by year (2014–2021)
+#'
+#' Predicted policy preference scores from the SVR model.
+#'
+#' @format A data frame with \code{case_id}, \code{year}, and policy columns
+#' suffixed with \code{_svr}.
+"policy_svr"
 
 #' Respondent demographics and weights by year (2014–2021)
 #'
@@ -76,14 +72,6 @@
 #'   \item{age}{Respondent age (numeric or integer).}
 #'   \item{educ}{Education coding used in analyses.}
 #'   \item{rural_urban}{Rural/urban classification used in analyses.}
-#'   \item{weight_cumulative}{Survey sample weight used (e.g., for RF fitting / weighted summaries).}
+#'   \item{weight_cumulative}{Survey sample weight used.}
 #' }
-#'
-#' @details
-#' Join keys are \code{case_id} and \code{year}. Use \code{\link{policy_raw}} and
-#' \code{\link{policy_rf}} for policy score tables.
-#'
-#' @examples
-#' data("demographics", package = "surveyMDV")
-#' head(demographics)
 "demographics"

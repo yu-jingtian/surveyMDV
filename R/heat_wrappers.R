@@ -156,6 +156,7 @@ plot_policy_heatgrid <- function(years,
 plot_policy_heat_single_rf <- function(year,
                                        policy_x,
                                        policy_y,
+                                       model = c("rf", "xbg", "lm", "svr"),
                                        subgroup1 = NULL,
                                        subgroup2 = NULL,
                                        panel = NULL,
@@ -166,8 +167,9 @@ plot_policy_heat_single_rf <- function(year,
     stop("`year` must be a single integer.", call. = FALSE)
   }
 
-  policy_vec <- .resolve_policy_names("rf", policy_x, policy_y)
-  df <- .prepare_year_df(year, type = "rf")
+  model <- match.arg(model)
+  policy_vec <- .resolve_policy_names("pred", policy_x, policy_y, model = model)
+  df <- .prepare_year_df(year, type = "pred", model = model)
 
   if (!is.null(panel)) {
     if (!is.list(panel)) {
@@ -190,7 +192,7 @@ plot_policy_heat_single_rf <- function(year,
   }
 
   if (is.null(title)) {
-    title <- paste0(year, " - ", panel_label)
+    title <- paste0(year, " - ", toupper(model), " - ", panel_label)
   }
 
   .draw_single_rf_heatmap_with_marginals(

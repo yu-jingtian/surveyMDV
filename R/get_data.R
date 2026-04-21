@@ -9,13 +9,6 @@
 #'
 #' @return A data frame containing raw policy scores.
 #' @export
-#'
-#' @examples
-#' # All years, all columns
-#' df <- get_policy_raw()
-#'
-#' # Single year, subset of columns
-#' df16 <- get_policy_raw(year = 2016, cols = c("immig", "guns"))
 get_policy_raw <- function(year = NULL, cols = NULL) {
   data("policy_raw", package = "surveyMDV", envir = environment())
 
@@ -43,27 +36,9 @@ get_policy_raw <- function(year = NULL, cols = NULL) {
   df
 }
 
-
-
-#' Get RF-predicted policy scores (2014–2021)
-#'
-#' Loads and returns the random-forest predicted policy score table, optionally
-#' filtered by year and reduced to selected columns.
-#'
-#' @param year Integer vector of survey years to keep. Default \code{NULL} keeps all years (2014--2021).
-#' @param cols Character vector of column names to return. Default \code{NULL} returns all columns.
-#'   Note: \code{case_id} and \code{year} are always included to support joins.
-#'
-#' @return A data frame containing RF-predicted policy scores.
-#' @export
-#'
-#' @examples
-#' df <- get_policy_rf()
-#' df21 <- get_policy_rf(year = 2021, cols = c("immig_rf", "guns_rf"))
-get_policy_rf <- function(year = NULL, cols = NULL) {
-  data("policy_rf", package = "surveyMDV", envir = environment())
-
-  df <- policy_rf
+.get_policy_pred <- function(dataset_name, year = NULL, cols = NULL) {
+  data(dataset_name, package = "surveyMDV", envir = environment())
+  df <- get(dataset_name, envir = environment())
 
   if (!is.null(year)) {
     year <- as.integer(year)
@@ -87,7 +62,41 @@ get_policy_rf <- function(year = NULL, cols = NULL) {
   df
 }
 
+#' Get RF-predicted policy scores (2014–2021)
+#' @param year Integer vector of survey years to keep.
+#' @param cols Character vector of column names to return.
+#' @return A data frame containing RF-predicted policy scores.
+#' @export
+get_policy_rf <- function(year = NULL, cols = NULL) {
+  .get_policy_pred("policy_rf", year = year, cols = cols)
+}
 
+#' Get XBG-predicted policy scores (2014–2021)
+#' @param year Integer vector of survey years to keep.
+#' @param cols Character vector of column names to return.
+#' @return A data frame containing XBG-predicted policy scores.
+#' @export
+get_policy_xbg <- function(year = NULL, cols = NULL) {
+  .get_policy_pred("policy_xbg", year = year, cols = cols)
+}
+
+#' Get LM-predicted policy scores (2014–2021)
+#' @param year Integer vector of survey years to keep.
+#' @param cols Character vector of column names to return.
+#' @return A data frame containing LM-predicted policy scores.
+#' @export
+get_policy_lm <- function(year = NULL, cols = NULL) {
+  .get_policy_pred("policy_lm", year = year, cols = cols)
+}
+
+#' Get SVR-predicted policy scores (2014–2021)
+#' @param year Integer vector of survey years to keep.
+#' @param cols Character vector of column names to return.
+#' @return A data frame containing SVR-predicted policy scores.
+#' @export
+get_policy_svr <- function(year = NULL, cols = NULL) {
+  .get_policy_pred("policy_svr", year = year, cols = cols)
+}
 
 #' Get respondent demographics (2014–2021)
 #'
@@ -100,9 +109,6 @@ get_policy_rf <- function(year = NULL, cols = NULL) {
 #'
 #' @return A data frame containing respondent demographics and weights.
 #' @export
-#'
-#' @examples
-#' demo <- get_demographics(year = 2018, cols = c("partisan", "race", "weight_cumulative"))
 get_demographics <- function(year = NULL, cols = NULL) {
   data("demographics", package = "surveyMDV", envir = environment())
 

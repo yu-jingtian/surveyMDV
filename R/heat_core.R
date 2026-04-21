@@ -5,16 +5,23 @@
 
 .is_null_or_empty <- function(x) is.null(x) || length(x) == 0
 
-.resolve_policy_names <- function(type, policy_x, policy_y) {
-  type <- match.arg(type, c("raw", "rf"))
+.resolve_policy_names <- function(type, policy_x, policy_y, model = NULL) {
+  type <- match.arg(type, c("raw", "rf", "xbg", "lm", "svr", "pred"))
   if (type == "raw") return(c(policy_x, policy_y))
+
+  if (type == "pred") {
+    if (is.null(model)) model <- "rf"
+    model <- match.arg(model, c("rf", "xbg", "lm", "svr"))
+  } else {
+    model <- type
+  }
 
   normalize_one <- function(x) {
     x <- as.character(x)
-    x <- sub("_pred_rf$", "", x)
+    x <- sub("_pred_(rf|xbg|lm|svr)$", "", x)
     x <- sub("_pred$", "", x)
-    x <- sub("_rf$", "", x)
-    paste0(x, "_rf")
+    x <- sub("_(rf|xbg|lm|svr)$", "", x)
+    paste0(x, "_", model)
   }
 
   c(normalize_one(policy_x), normalize_one(policy_y))
@@ -53,7 +60,7 @@
 }
 
 .pretty_policy_label <- function(x) {
-  x0 <- gsub("_pred_rf$|_pred$|_rf$", "", x)
+  x0 <- gsub("_pred_(rf|xbg|lm|svr)$|_pred$|_(rf|xbg|lm|svr)$", "", x)
 
   lab_map <- c(
     guns = "Gun control",
@@ -76,14 +83,25 @@
 
 # ---- data prep ----
 
-.prepare_year_df <- function(year, type) {
+.prepare_year_df <- function(year, type, model = NULL) {
   year <- as.integer(year)
-  type <- match.arg(type, c("raw", "rf"))
+  type <- match.arg(type, c("raw", "rf", "xbg", "lm", "svr", "pred"))
+
+  if (type == "pred") {
+    if (is.null(model)) model <- "rf"
+    type <- match.arg(model, c("rf", "xbg", "lm", "svr"))
+  }
 
   if (type == "raw") {
     pol <- get_policy_raw(year = year, cols = NULL)
-  } else {
+  } else if (type == "rf") {
     pol <- get_policy_rf(year = year, cols = NULL)
+  } else if (type == "xbg") {
+    pol <- get_policy_xbg(year = year, cols = NULL)
+  } else if (type == "lm") {
+    pol <- get_policy_lm(year = year, cols = NULL)
+  } else {
+    pol <- get_policy_svr(year = year, cols = NULL)
   }
   demo <- get_demographics(year = year, cols = NULL)
 
@@ -399,8 +417,8 @@
 
 # ---- single RF heatmap + marginals ----
 
-.single_rf_counts <- function(df, policy_vec, breaks = seq(0, 1, by = 0.05)) {
-  .check_required_cols(df, policy_vec, context = "single RF heatmap")
+.single_pred_counts <- function(df, policy_vec, breaks = seq(0, 1, by = 0.05)) {
+  .check_required_cols(df, policy_vec, context = "single predicted heatmap")
 
   ok <- .usable_xy(df, policy_vec)
   if (!any(ok)) return(NULL)
@@ -423,6 +441,7 @@
   heat$y_bin <- factor(heat$y_bin, levels = y_levels, ordered = TRUE)
   heat$x_mid <- x_mids[match(heat$x_bin, x_levels)]
   heat$y_mid <- y_mids[match(heat$y_bin, y_levels)]
+  heat$Prop <- heat$Freq / sum(ok)
 
   list(
     heat = heat,
@@ -448,19 +467,20 @@
     stop("Package 'grid' is required.", call. = FALSE)
   }
 
-  counts <- .single_rf_counts(df, policy_vec, breaks = breaks)
+  counts <- .single_pred_counts(df, policy_vec, breaks = breaks)
   if (is.null(counts)) {
     stop("No non-missing observations available for the requested year/panel/policies.", call. = FALSE)
   }
 
   heat_df <- counts$heat
-  max_freq <- max(heat_df$Freq, na.rm = TRUE)
-  if (!is.finite(max_freq) || max_freq <= 0) max_freq <- 1
+  max_prop <- max(heat_df$Prop, na.rm = TRUE)
+  if (!is.finite(max_prop) || max_prop <= 0) max_prop <- 1
 
   x_lab <- .pretty_policy_label(policy_vec[1])
   y_lab <- .pretty_policy_label(policy_vec[2])
   rng <- c(0, 1)
   bin_w <- counts$bin_w
+  tick_breaks <- c(0, 0.25, 0.5, 0.75, 1)
 
   plot_dist_hist <- function(z, lab = NULL, rng = c(0, 1), side = c("bottom", "left")) {
     side <- match.arg(side, c("bottom", "left"))
@@ -481,6 +501,7 @@
       ) +
       ggplot2::scale_x_continuous(
         limits = rng,
+        breaks = tick_breaks,
         expand = c(0, 0)
       ) +
       ggplot2::theme_minimal(base_size = 11) +
@@ -489,29 +510,29 @@
         panel.border = ggplot2::element_blank(),
         panel.grid.major = ggplot2::element_blank(),
         panel.grid.minor = ggplot2::element_blank(),
-        axis.line = ggplot2::element_blank(),
+        axis.line = ggplot2::element_line(color = "grey30", linewidth = 0.3),
         panel.background = ggplot2::element_blank(),
-        axis.text = ggplot2::element_blank(),
-        axis.ticks = ggplot2::element_blank()
+        axis.text = ggplot2::element_text(size = 9, color = "black"),
+        axis.ticks = ggplot2::element_line(color = "grey30", linewidth = 0.3)
       )
 
     if (side == "bottom") {
       p <- p +
         ggplot2::scale_y_reverse(expand = c(0, 0)) +
-        ggplot2::labs(x = lab, y = NULL) +
+        ggplot2::labs(x = lab, y = "Density") +
         ggplot2::theme(
           axis.title.x = ggplot2::element_text(size = 16),
-          axis.title.y = ggplot2::element_blank(),
+          axis.title.y = ggplot2::element_text(size = 12),
           plot.margin = ggplot2::margin(t = 0, r = 5.5, b = 5.5, l = 0)
         )
     } else {
       p <- p +
         ggplot2::coord_flip() +
         ggplot2::scale_y_reverse(expand = c(0, 0)) +
-        ggplot2::labs(x = NULL, y = NULL) +
+        ggplot2::labs(x = NULL, y = "Density") +
         ggplot2::theme(
           axis.title.x = ggplot2::element_blank(),
-          axis.title.y = ggplot2::element_blank(),
+          axis.title.y = ggplot2::element_text(size = 12),
           plot.margin = ggplot2::margin(t = 5.5, r = 0, b = 0, l = 0)
         )
     }
@@ -519,22 +540,27 @@
     p
   }
 
-  p_heat <- ggplot2::ggplot(heat_df, ggplot2::aes(x = x_mid, y = y_mid, fill = Freq)) +
+  p_heat <- ggplot2::ggplot(heat_df, ggplot2::aes(x = x_mid, y = y_mid, fill = Prop)) +
     ggplot2::geom_tile(width = bin_w, height = bin_w, color = "white", linewidth = 0.2) +
     ggplot2::scale_fill_gradient2(
-      midpoint = 0.5 * max_freq,
-      limits = c(0, max_freq),
-      low = low, mid = mid, high = high
+      midpoint = 0.5 * max_prop,
+      limits = c(0, max_prop),
+      low = low, mid = mid, high = high,
+      name = "Proportion",
+      labels = function(x) format(round(x, 3), nsmall = 3)
     ) +
-    ggplot2::scale_x_continuous(limits = rng, expand = c(0, 0)) +
-    ggplot2::scale_y_continuous(limits = rng, expand = c(0, 0)) +
+    ggplot2::scale_x_continuous(limits = rng, breaks = tick_breaks, expand = c(0, 0)) +
+    ggplot2::scale_y_continuous(limits = rng, breaks = tick_breaks, expand = c(0, 0)) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid = ggplot2::element_blank(),
-      axis.text = ggplot2::element_blank(),
-      axis.ticks = ggplot2::element_blank(),
+      axis.text = ggplot2::element_text(size = 9, color = "black"),
+      axis.ticks = ggplot2::element_line(color = "grey30", linewidth = 0.3),
+      axis.line = ggplot2::element_line(color = "grey30", linewidth = 0.3),
       axis.title = ggplot2::element_blank(),
-      legend.position = "none",
+      legend.position = "right",
+      legend.title = ggplot2::element_text(size = 11),
+      legend.text = ggplot2::element_text(size = 9),
       plot.margin = ggplot2::margin(5.5, 5.5, 0, 0)
     )
 
@@ -550,19 +576,19 @@
   top_grob <- gridExtra::arrangeGrob(
     grobs = list(y_lab_grob, p_left, p_heat),
     ncol = 3,
-    widths = c(0.55, 1, 5)
+    widths = c(0.55, 1.2, 6.2)
   )
 
   bottom_grob <- gridExtra::arrangeGrob(
     grobs = list(grid::nullGrob(), grid::nullGrob(), p_bottom),
     ncol = 3,
-    widths = c(0.55, 1, 5)
+    widths = c(0.55, 1.2, 6.2)
   )
 
   g <- gridExtra::arrangeGrob(
     grobs = list(top_grob, bottom_grob),
     ncol = 1,
-    heights = c(5, 1)
+    heights = c(5.2, 1.4)
   )
 
   if (!is.null(title) && nzchar(title)) {
