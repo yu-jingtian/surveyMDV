@@ -28,12 +28,8 @@ A dataset of survey-based raw policy preference scores covering survey years
 (identified by \code{case_id}) in one survey \code{year}.
 }
 \details{
-Join keys are \code{case_id} and \code{year}. Use \code{\link{policy_rf}} for
-random-forest predicted scores, and \code{\link{demographics}} for covariates
-and survey weights.
-}
-\examples{
-data("policy_raw", package = "surveyMDV")
-head(policy_raw)
+Join keys are \code{case_id} and \code{year}. Use \code{\link{policy_rf}},
+\code{\link{policy_xgb}}, \code{\link{policy_lm}}, \code{\link{policy_svr}},
+and \code{\link{demographics}} for predicted scores and covariates.
 }
 \keyword{datasets}

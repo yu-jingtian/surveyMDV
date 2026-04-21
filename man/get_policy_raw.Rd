@@ -19,10 +19,3 @@ A data frame containing raw policy scores.
 Loads and returns the raw policy score table, optionally filtered by year and
 reduced to selected columns.
 }
-\examples{
-# All years, all columns
-df <- get_policy_raw()
-
-# Single year, subset of columns
-df16 <- get_policy_raw(year = 2016, cols = c("immig", "guns"))
-}

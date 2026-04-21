@@ -20,7 +20,7 @@
 #'
 #' @details
 #' Join keys are \code{case_id} and \code{year}. Use \code{\link{policy_rf}},
-#' \code{\link{policy_xbg}}, \code{\link{policy_lm}}, \code{\link{policy_svr}},
+#' \code{\link{policy_xgb}}, \code{\link{policy_lm}}, \code{\link{policy_svr}},
 #' and \code{\link{demographics}} for predicted scores and covariates.
 "policy_raw"
 
@@ -32,13 +32,13 @@
 #' suffixed with \code{_rf}.
 "policy_rf"
 
-#' XBG predicted policy scores by year (2014–2021)
+#' XGB predicted policy scores by year (2014–2021)
 #'
-#' Predicted policy preference scores from the XBG model.
+#' Predicted policy preference scores from the XGB model.
 #'
 #' @format A data frame with \code{case_id}, \code{year}, and policy columns
-#' suffixed with \code{_xbg}.
-"policy_xbg"
+#' suffixed with \code{_xgb}.
+"policy_xgb"
 
 #' Linear-model predicted policy scores by year (2014–2021)
 #'

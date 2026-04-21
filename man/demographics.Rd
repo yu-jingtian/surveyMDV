@@ -15,7 +15,7 @@ A data frame with the following columns:
 \item{age}{Respondent age (numeric or integer).}
 \item{educ}{Education coding used in analyses.}
 \item{rural_urban}{Rural/urban classification used in analyses.}
-\item{weight_cumulative}{Survey sample weight used (e.g., for RF fitting / weighted summaries).}
+\item{weight_cumulative}{Survey sample weight used.}
 }
 }
 \usage{
@@ -25,13 +25,5 @@ demographics
 A dataset of respondent-level demographics (and survey weights) covering
 survey years 2014 through 2021 (inclusive). Each row corresponds to one
 respondent (identified by \code{case_id}) in one survey \code{year}.
-}
-\details{
-Join keys are \code{case_id} and \code{year}. Use \code{\link{policy_raw}} and
-\code{\link{policy_rf}} for policy score tables.
-}
-\examples{
-data("demographics", package = "surveyMDV")
-head(demographics)
 }
 \keyword{datasets}

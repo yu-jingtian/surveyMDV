@@ -19,6 +19,3 @@ A data frame containing respondent demographics and weights.
 Loads and returns the demographics table, optionally filtered by year and
 reduced to selected columns.
 }
-\examples{
-demo <- get_demographics(year = 2018, cols = c("partisan", "race", "weight_cumulative"))
-}

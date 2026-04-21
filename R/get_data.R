@@ -37,7 +37,7 @@ get_policy_raw <- function(year = NULL, cols = NULL) {
 }
 
 .get_policy_pred <- function(dataset_name, year = NULL, cols = NULL) {
-  data(dataset_name, package = "surveyMDV", envir = environment())
+  utils::data(list = dataset_name, package = "surveyMDV", envir = environment())
   df <- get(dataset_name, envir = environment())
 
   if (!is.null(year)) {
@@ -71,13 +71,13 @@ get_policy_rf <- function(year = NULL, cols = NULL) {
   .get_policy_pred("policy_rf", year = year, cols = cols)
 }
 
-#' Get XBG-predicted policy scores (2014–2021)
+#' Get XGB-predicted policy scores (2014–2021)
 #' @param year Integer vector of survey years to keep.
 #' @param cols Character vector of column names to return.
-#' @return A data frame containing XBG-predicted policy scores.
+#' @return A data frame containing XGB-predicted policy scores.
 #' @export
-get_policy_xbg <- function(year = NULL, cols = NULL) {
-  .get_policy_pred("policy_xbg", year = year, cols = cols)
+get_policy_xgb <- function(year = NULL, cols = NULL) {
+  .get_policy_pred("policy_xgb", year = year, cols = cols)
 }
 
 #' Get LM-predicted policy scores (2014–2021)

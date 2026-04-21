@@ -153,10 +153,10 @@ plot_policy_heatgrid <- function(years,
 #'
 #' @return A grid grob.
 #' @export
-plot_policy_heat_single_rf <- function(year,
+plot_policy_heat_single <- function(year,
                                        policy_x,
                                        policy_y,
-                                       model = c("rf", "xbg", "lm", "svr"),
+                                       model = c("rf", "xgb", "lm", "svr"),
                                        subgroup1 = NULL,
                                        subgroup2 = NULL,
                                        panel = NULL,
@@ -203,3 +203,7 @@ plot_policy_heat_single_rf <- function(year,
     subtitle = NULL
   )
 }
+
+
+# Backward-compatible alias
+plot_policy_heat_single_rf <- plot_policy_heat_single

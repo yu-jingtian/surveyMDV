@@ -6,21 +6,21 @@
 .is_null_or_empty <- function(x) is.null(x) || length(x) == 0
 
 .resolve_policy_names <- function(type, policy_x, policy_y, model = NULL) {
-  type <- match.arg(type, c("raw", "rf", "xbg", "lm", "svr", "pred"))
+  type <- match.arg(type, c("raw", "rf", "xgb", "lm", "svr", "pred"))
   if (type == "raw") return(c(policy_x, policy_y))
 
   if (type == "pred") {
     if (is.null(model)) model <- "rf"
-    model <- match.arg(model, c("rf", "xbg", "lm", "svr"))
+    model <- match.arg(model, c("rf", "xgb", "lm", "svr"))
   } else {
     model <- type
   }
 
   normalize_one <- function(x) {
     x <- as.character(x)
-    x <- sub("_pred_(rf|xbg|lm|svr)$", "", x)
+    x <- sub("_pred_(rf|xgb|lm|svr)$", "", x)
     x <- sub("_pred$", "", x)
-    x <- sub("_(rf|xbg|lm|svr)$", "", x)
+    x <- sub("_(rf|xgb|lm|svr)$", "", x)
     paste0(x, "_", model)
   }
 
@@ -60,7 +60,7 @@
 }
 
 .pretty_policy_label <- function(x) {
-  x0 <- gsub("_pred_(rf|xbg|lm|svr)$|_pred$|_(rf|xbg|lm|svr)$", "", x)
+  x0 <- gsub("_pred_(rf|xgb|lm|svr)$|_pred$|_(rf|xgb|lm|svr)$", "", x)
 
   lab_map <- c(
     guns = "Gun control",
@@ -85,19 +85,19 @@
 
 .prepare_year_df <- function(year, type, model = NULL) {
   year <- as.integer(year)
-  type <- match.arg(type, c("raw", "rf", "xbg", "lm", "svr", "pred"))
+  type <- match.arg(type, c("raw", "rf", "xgb", "lm", "svr", "pred"))
 
   if (type == "pred") {
     if (is.null(model)) model <- "rf"
-    type <- match.arg(model, c("rf", "xbg", "lm", "svr"))
+    type <- match.arg(model, c("rf", "xgb", "lm", "svr"))
   }
 
   if (type == "raw") {
     pol <- get_policy_raw(year = year, cols = NULL)
   } else if (type == "rf") {
     pol <- get_policy_rf(year = year, cols = NULL)
-  } else if (type == "xbg") {
-    pol <- get_policy_xbg(year = year, cols = NULL)
+  } else if (type == "xgb") {
+    pol <- get_policy_xgb(year = year, cols = NULL)
   } else if (type == "lm") {
     pol <- get_policy_lm(year = year, cols = NULL)
   } else {
@@ -540,11 +540,12 @@
     p
   }
 
-  p_heat <- ggplot2::ggplot(heat_df, ggplot2::aes(x = x_mid, y = y_mid, fill = Prop)) +
+  p_heat_base <- ggplot2::ggplot(heat_df, ggplot2::aes(x = x_mid, y = y_mid, fill = Prop)) +
     ggplot2::geom_tile(width = bin_w, height = bin_w, color = "white", linewidth = 0.2) +
     ggplot2::scale_fill_gradient2(
       midpoint = 0.5 * max_prop,
       limits = c(0, max_prop),
+      breaks = c(0, 0.5 * max_prop, max_prop),
       low = low, mid = mid, high = high,
       name = "Proportion",
       labels = function(x) format(round(x, 3), nsmall = 3)
@@ -554,9 +555,9 @@
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid = ggplot2::element_blank(),
-      axis.text = ggplot2::element_text(size = 9, color = "black"),
-      axis.ticks = ggplot2::element_line(color = "grey30", linewidth = 0.3),
-      axis.line = ggplot2::element_line(color = "grey30", linewidth = 0.3),
+      axis.text = ggplot2::element_blank(),
+      axis.ticks = ggplot2::element_blank(),
+      axis.line = ggplot2::element_blank(),
       axis.title = ggplot2::element_blank(),
       legend.position = "right",
       legend.title = ggplot2::element_text(size = 11),
@@ -564,8 +565,40 @@
       plot.margin = ggplot2::margin(5.5, 5.5, 0, 0)
     )
 
-  p_left <- plot_dist_hist(counts$y, lab = y_lab, rng = rng, side = "left")
-  p_bottom <- plot_dist_hist(counts$x, lab = x_lab, rng = rng, side = "bottom")
+  p_left <- plot_dist_hist(counts$y, lab = y_lab, rng = rng, side = "left") +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      axis.line.x = ggplot2::element_blank(),
+      axis.title.x = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_text(size = 9, color = "black"),
+      axis.ticks.y = ggplot2::element_line(color = "grey30", linewidth = 0.3),
+      axis.line.y = ggplot2::element_line(color = "grey30", linewidth = 0.3),
+      plot.margin = ggplot2::margin(5.5, 0, 0, 0)
+    )
+
+  p_bottom <- plot_dist_hist(counts$x, lab = x_lab, rng = rng, side = "bottom") +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(size = 9, color = "black"),
+      axis.ticks.x = ggplot2::element_line(color = "grey30", linewidth = 0.3),
+      axis.line.x = ggplot2::element_line(color = "grey30", linewidth = 0.3),
+      axis.title.y = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      axis.line.y = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(0, 0, 5.5, 0)
+    )
+
+  heat_grob_full <- ggplot2::ggplotGrob(p_heat_base)
+  guide_idx <- which(sapply(heat_grob_full$grobs, function(x) x$name) == "guide-box")
+  if (length(guide_idx) > 0) {
+    legend_grob <- heat_grob_full$grobs[[guide_idx[1]]]
+  } else {
+    legend_grob <- grid::nullGrob()
+  }
+
+  p_heat <- p_heat_base + ggplot2::theme(legend.position = "none", plot.margin = ggplot2::margin(5.5, 0, 0, 0))
 
   y_lab_grob <- grid::textGrob(
     y_lab,
@@ -574,15 +607,15 @@
   )
 
   top_grob <- gridExtra::arrangeGrob(
-    grobs = list(y_lab_grob, p_left, p_heat),
-    ncol = 3,
-    widths = c(0.55, 1.2, 6.2)
+    grobs = list(y_lab_grob, p_left, p_heat, legend_grob),
+    ncol = 4,
+    widths = c(0.75, 1.2, 5.8, 1.4)
   )
 
   bottom_grob <- gridExtra::arrangeGrob(
-    grobs = list(grid::nullGrob(), grid::nullGrob(), p_bottom),
-    ncol = 3,
-    widths = c(0.55, 1.2, 6.2)
+    grobs = list(grid::nullGrob(), grid::nullGrob(), p_bottom, grid::nullGrob()),
+    ncol = 4,
+    widths = c(0.75, 1.2, 5.8, 1.4)
   )
 
   g <- gridExtra::arrangeGrob(
