@@ -64,21 +64,41 @@
 
   lab_map <- c(
     guns = "Gun control",
-    enviro = "Environment",
-    environment = "Environment",
-    abortion = "Abortion",
-    immig = "Immigration",
-    immigration = "Immigration",
-    healthcare = "Healthcare",
-    military = "Military",
-    spending = "Spending",
-    trade = "Trade"
+    enviro = "Environmental protection",
+    environment = "Environmental protection",
+    abortion = "Abortion access",
+    immig = "Immigration restriction",
+    immigration = "Immigration restriction",
+    healthcare = "Public health care",
+    military = "Military intervention",
+    spending = "Government spending priorities",
+    trade = "Trade protectionism"
   )
 
   if (x0 %in% names(lab_map)) return(unname(lab_map[[x0]]))
 
   x0 <- gsub("_", " ", x0)
   paste0(toupper(substr(x0, 1, 1)), substr(x0, 2, nchar(x0)))
+}
+
+.policy_tick_labels <- function(x) {
+  x0 <- gsub("_pred_(rf|xgb|lm|svr)$|_pred$|_(rf|xgb|lm|svr)$", "", x)
+
+  tick_map <- list(
+    abortion = c("Access", "Mixed", "Restriction"),
+    enviro = c("Weaker", "Mixed", "Stronger"),
+    environment = c("Weaker", "Mixed", "Stronger"),
+    guns = c("Permissive", "Mixed", "Stricter"),
+    immig = c("Legalization", "Mixed", "Restriction"),
+    immigration = c("Legalization", "Mixed", "Restriction"),
+    healthcare = c("Market-based", "Mixed", "Government-led"),
+    military = c("Restrained", "Mixed", "Hawkish"),
+    spending = c("Expand services", "Mixed", "Cut services"),
+    trade = c("Free trade", "Mixed", "Protectionist")
+  )
+
+  if (x0 %in% names(tick_map)) return(unname(tick_map[[x0]]))
+  c("Low", "Mixed", "High")
 }
 
 # ---- data prep ----
@@ -480,7 +500,9 @@
   y_lab <- .pretty_policy_label(policy_vec[2])
   rng <- c(0, 1)
   bin_w <- counts$bin_w
-  tick_breaks <- c(0, 0.25, 0.5, 0.75, 1)
+  tick_breaks <- c(0, 0.5, 1)
+  x_tick_labels <- .policy_tick_labels(policy_vec[1])
+  y_tick_labels <- .policy_tick_labels(policy_vec[2])
 
   plot_dist_hist <- function(z, lab = NULL, rng = c(0, 1), side = c("bottom", "left")) {
     side <- match.arg(side, c("bottom", "left"))
@@ -502,6 +524,7 @@
       ggplot2::scale_x_continuous(
         limits = rng,
         breaks = tick_breaks,
+        labels = if (side == "bottom") x_tick_labels else y_tick_labels,
         expand = c(0, 0)
       ) +
       ggplot2::theme_minimal(base_size = 11) +
@@ -550,8 +573,8 @@
       name = "Proportion",
       labels = function(x) format(round(x, 3), nsmall = 3)
     ) +
-    ggplot2::scale_x_continuous(limits = rng, breaks = tick_breaks, expand = c(0, 0)) +
-    ggplot2::scale_y_continuous(limits = rng, breaks = tick_breaks, expand = c(0, 0)) +
+    ggplot2::scale_x_continuous(limits = rng, breaks = tick_breaks, labels = x_tick_labels, expand = c(0, 0)) +
+    ggplot2::scale_y_continuous(limits = rng, breaks = tick_breaks, labels = y_tick_labels, expand = c(0, 0)) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
       panel.grid = ggplot2::element_blank(),
@@ -572,7 +595,7 @@
       axis.line.x = ggplot2::element_blank(),
       axis.title.x = ggplot2::element_blank(),
       axis.title.y = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_text(size = 9, color = "black"),
+      axis.text.y = ggplot2::element_text(size = 9, color = "black", angle = 90, vjust = 0.5, hjust = 0.5),
       axis.ticks.y = ggplot2::element_line(color = "grey30", linewidth = 0.3),
       axis.line.y = ggplot2::element_line(color = "grey30", linewidth = 0.3),
       plot.margin = ggplot2::margin(5.5, 0, 0, 0)
@@ -629,7 +652,7 @@
       g,
       top = grid::textGrob(
         label = title,
-        x = 0.02, hjust = 0,
+        x = 0.5, hjust = 0.5,
         gp = grid::gpar(fontsize = 20, fontface = "bold")
       )
     )

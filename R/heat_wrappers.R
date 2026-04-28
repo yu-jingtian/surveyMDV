@@ -192,7 +192,7 @@ plot_policy_heat_single <- function(year,
   }
 
   if (is.null(title)) {
-    title <- paste0(year, " - ", toupper(model), " - ", panel_label)
+    title <- paste0(year, ", ", panel_label, ", Model: ", toupper(model))
   }
 
   .draw_single_rf_heatmap_with_marginals(
