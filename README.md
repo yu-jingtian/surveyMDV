@@ -133,26 +133,6 @@ Below are examples of visualization outputs:
 
 <table>
   <tr>
-    <th width="70%">Figure</th>
-    <th width="30%">Description</th>
-  </tr>
-  <tr>
-    <td>
-      <img src="figs/immig_trade_2019_rf.jpeg" width="100%">
-    </td>
-    <td>
-      <b>Single Heatmap.</b> Single-year model-based heatmap with marginal distributions. The heatmap summarizes the joint distribution of two predicted policy attitudes, while the side histograms and density curves show the corresponding one-dimensional marginal patterns.
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <img src="figs/heatrow_2021_healthcare_abortion_partisan.jpeg" width="100%">
-    </td>
-    <td>
-      <b>Heatmap Row.</b> One-year partisan row for Population, Republican, Independent, and Democrat respondents. This view provides a compact comparison of the same two-dimensional policy structure across major partisan groups.
-    </td>
-  </tr>
-  <tr>
     <td>
       <img src="figs/heatgrid_abortion_healthcare.jpeg" width="100%">
     </td>
@@ -170,8 +150,6 @@ Below are examples of visualization outputs:
   </tr>
 </table>
 
-For more figures and explanations, see the `docs/` folder.
-
 ---
 
 ## 4. Data Sources
@@ -179,12 +157,5 @@ For more figures and explanations, see the `docs/` folder.
   [https://doi.org/10.7910/DVN/OSXDQO](https://doi.org/10.7910/DVN/OSXDQO)
 - **Corresponding Demographic Survey** Cumulative CES Common Content:  
   [https://doi.org/10.7910/DVN/II2DB6](https://doi.org/10.7910/DVN/II2DB6)
-
-
----
-
-## 5. Contact
-For questions or collaboration:
-- **Author:** [Your Name]  
-- **Email:** [your_email@domain.edu]  
-- **Institution:** Oregon State University
+- **Geographical Information**  2023 Rural-Urban Continuum Codes (RUCC):
+  [https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/](https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/)
