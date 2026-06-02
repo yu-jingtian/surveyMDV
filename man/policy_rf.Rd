@@ -3,7 +3,7 @@
 \docType{data}
 \name{policy_rf}
 \alias{policy_rf}
-\title{Random-forest predicted policy scores by year (2014–2021)}
+\title{Random-forest predicted policy scores by year (2014--2021)}
 \format{
 A data frame with \code{case_id}, \code{year}, and policy columns
 suffixed with \code{_rf}.

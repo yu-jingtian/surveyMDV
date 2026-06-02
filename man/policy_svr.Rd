@@ -3,7 +3,7 @@
 \docType{data}
 \name{policy_svr}
 \alias{policy_svr}
-\title{SVR predicted policy scores by year (2014–2021)}
+\title{SVR predicted policy scores by year (2014--2021)}
 \format{
 A data frame with \code{case_id}, \code{year}, and policy columns
 suffixed with \code{_svr}.

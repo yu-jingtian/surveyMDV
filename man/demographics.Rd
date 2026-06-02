@@ -3,7 +3,7 @@
 \docType{data}
 \name{demographics}
 \alias{demographics}
-\title{Respondent demographics and weights by year (2014–2021)}
+\title{Respondent demographics and weights by year (2014--2021)}
 \format{
 A data frame with the following columns:
 \describe{
@@ -12,7 +12,7 @@ A data frame with the following columns:
 \item{partisan}{Partisanship coding used in analyses.}
 \item{race}{Race/ethnicity coding used in analyses.}
 \item{gender}{Gender coding used in analyses.}
-\item{age}{Respondent age (numeric or integer).}
+\item{age}{Respondent age.}
 \item{educ}{Education coding used in analyses.}
 \item{rural_urban}{Rural/urban classification used in analyses.}
 \item{weight_cumulative}{Survey sample weight used.}
@@ -22,8 +22,8 @@ A data frame with the following columns:
 demographics
 }
 \description{
-A dataset of respondent-level demographics (and survey weights) covering
-survey years 2014 through 2021 (inclusive). Each row corresponds to one
-respondent (identified by \code{case_id}) in one survey \code{year}.
+A dataset of respondent-level demographics and survey weights covering
+survey years 2014 through 2021. Each row corresponds to one respondent
+identified by \code{case_id} in one survey \code{year}.
 }
 \keyword{datasets}

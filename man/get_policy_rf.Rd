@@ -2,7 +2,7 @@
 % Please edit documentation in R/get_data.R
 \name{get_policy_rf}
 \alias{get_policy_rf}
-\title{Get RF-predicted policy scores (2014–2021)}
+\title{Get RF-predicted policy scores (2014--2021)}
 \usage{
 get_policy_rf(year = NULL, cols = NULL)
 }
@@ -15,5 +15,5 @@ get_policy_rf(year = NULL, cols = NULL)
 A data frame containing RF-predicted policy scores.
 }
 \description{
-Get RF-predicted policy scores (2014–2021)
+Get RF-predicted policy scores (2014--2021)
 }

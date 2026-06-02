@@ -1,20 +1,22 @@
 # R/heat_core.R
-# Internal (non-exported) helpers for data prep, scaling, and drawing panels.
+# Internal helpers for model-predicted policy heatmaps.
+
+# ---- constants ----
+
+.DEFAULT_HEAT_BREAKS <- seq(0, 1, by = 0.05)
+.DEFAULT_AXIS_TITLE_SIZE <- 16
+.DEFAULT_AXIS_TICK_SIZE <- 9
+.DEFAULT_AXIS_TICK_PAD <- 0.06
+.DEFAULT_LOW_COLOR <- "#c6dbef"
+.DEFAULT_MID_COLOR <- "#F4B811"
+.DEFAULT_HIGH_COLOR <- "#CC2929"
 
 # ---- utilities ----
 
 .is_null_or_empty <- function(x) is.null(x) || length(x) == 0
 
-.resolve_policy_names <- function(type, policy_x, policy_y, model = NULL) {
-  type <- match.arg(type, c("raw", "rf", "xgb", "lm", "svr", "pred"))
-  if (type == "raw") return(c(policy_x, policy_y))
-
-  if (type == "pred") {
-    if (is.null(model)) model <- "rf"
-    model <- match.arg(model, c("rf", "xgb", "lm", "svr"))
-  } else {
-    model <- type
-  }
+.resolve_policy_names <- function(model = c("rf", "xgb", "lm", "svr"), policy_x, policy_y) {
+  model <- match.arg(model)
 
   normalize_one <- function(x) {
     x <- as.character(x)
@@ -103,26 +105,11 @@
 
 # ---- data prep ----
 
-.prepare_year_df <- function(year, type, model = NULL) {
+.prepare_year_df <- function(year, model = c("rf", "xgb", "lm", "svr")) {
   year <- as.integer(year)
-  type <- match.arg(type, c("raw", "rf", "xgb", "lm", "svr", "pred"))
+  model <- match.arg(model)
 
-  if (type == "pred") {
-    if (is.null(model)) model <- "rf"
-    type <- match.arg(model, c("rf", "xgb", "lm", "svr"))
-  }
-
-  if (type == "raw") {
-    pol <- get_policy_raw(year = year, cols = NULL)
-  } else if (type == "rf") {
-    pol <- get_policy_rf(year = year, cols = NULL)
-  } else if (type == "xgb") {
-    pol <- get_policy_xgb(year = year, cols = NULL)
-  } else if (type == "lm") {
-    pol <- get_policy_lm(year = year, cols = NULL)
-  } else {
-    pol <- get_policy_svr(year = year, cols = NULL)
-  }
+  pol <- get_policy_predicted(model = model, year = year, cols = NULL)
   demo <- get_demographics(year = year, cols = NULL)
 
   merge(pol, demo, by = c("case_id", "year"), all = FALSE)
@@ -132,7 +119,6 @@
   if (is.null(panel$filter)) return(df)
   panel$filter(df)
 }
-
 
 .panel_label <- function(panel) {
   if (is.null(panel)) return("Population")
@@ -154,25 +140,40 @@
   "Custom panel"
 }
 
-.resolve_single_subgroup_filter <- function(subgroup) {
-  if (is.null(subgroup)) {
+.resolve_group_filter <- function(group = "population") {
+  if (is.null(group)) group <- "population"
+  key <- tolower(trimws(as.character(group)))
+
+  if (key %in% c("population", "all", "overall")) {
     return(list(label = "Population", filter = function(df) df))
+  }
+  if (key %in% c("rep", "rep.", "republican", "republicans")) {
+    return(list(label = "Rep.", filter = function(df) df[df$partisan == "Rep.", , drop = FALSE]))
+  }
+  if (key %in% c("dem", "dem.", "democrat", "democrats")) {
+    return(list(label = "Dem.", filter = function(df) df[df$partisan == "Dem.", , drop = FALSE]))
+  }
+  if (key %in% c("ind", "ind.", "independent", "independents")) {
+    return(list(label = "Ind.", filter = function(df) df[df$partisan == "Ind.", , drop = FALSE]))
+  }
+
+  stop(
+    "Unknown group: ", group,
+    ". Supported values are 'population', 'republican', 'independent', and 'democrat'.",
+    call. = FALSE
+  )
+}
+
+.resolve_subgroup_filter <- function(subgroup = NULL) {
+  if (is.null(subgroup)) {
+    return(list(label = NULL, filter = function(df) df))
   }
 
   key <- trimws(as.character(subgroup))
   key_low <- tolower(key)
 
   if (key_low %in% c("population", "all", "overall")) {
-    return(list(label = "Population", filter = function(df) df))
-  }
-  if (key_low %in% c("rep", "rep.", "republican", "republicans")) {
-    return(list(label = "Rep.", filter = function(df) df[df$partisan == "Rep.", , drop = FALSE]))
-  }
-  if (key_low %in% c("dem", "dem.", "democrat", "democrats")) {
-    return(list(label = "Dem.", filter = function(df) df[df$partisan == "Dem.", , drop = FALSE]))
-  }
-  if (key_low %in% c("ind", "ind.", "independent", "independents")) {
-    return(list(label = "Ind.", filter = function(df) df[df$partisan == "Ind.", , drop = FALSE]))
+    return(list(label = NULL, filter = function(df) df))
   }
   if (key_low %in% c("college", "college+", "college educated")) {
     return(list(label = "College", filter = function(df) df[df$educ %in% c(4, 5, 6), , drop = FALSE]))
@@ -183,7 +184,7 @@
   if (key_low %in% c("metro", "big metro", "urban")) {
     return(list(label = "Big Metro", filter = function(df) df[df$rural_urban %in% c(1), , drop = FALSE]))
   }
-  if (key_low %in% c("non-metro", "nonmetro", "other co.", "other county", "rural")) {
+  if (key_low %in% c("non-metro", "nonmetro", "other co.", "other co", "other county", "rural")) {
     return(list(label = "Other Co.", filter = function(df) df[df$rural_urban %in% c(2,3,4,5,6,7,8,9), , drop = FALSE]))
   }
   if (key_low %in% c("female", "woman", "women")) {
@@ -195,33 +196,37 @@
 
   stop(
     "Unknown subgroup: ", subgroup,
-    ". Supported values include 'Rep.', 'Dem.', 'Ind.', 'college', 'non-college', 'metro', 'non-metro', 'female', 'male'.",
+    ". Supported values include 'college', 'non-college', 'metro', 'non-metro', 'female', and 'male'.",
     call. = FALSE
   )
 }
 
-.resolve_subgroup_filters <- function(subgroup1 = NULL, subgroup2 = NULL) {
-  s1 <- .resolve_single_subgroup_filter(subgroup1)
+.resolve_group_subgroup_filter <- function(group = "population", subgroup = NULL) {
+  group_spec <- .resolve_group_filter(group)
+  subgroup_spec <- .resolve_subgroup_filter(subgroup)
 
-  if (is.null(subgroup2)) {
-    return(list(label = s1$label, filter = s1$filter))
+  label <- group_spec$label
+  if (!is.null(subgroup_spec$label)) {
+    if (identical(label, "Population")) {
+      label <- subgroup_spec$label
+    } else {
+      label <- paste(label, subgroup_spec$label)
+    }
   }
 
-  s2 <- .resolve_single_subgroup_filter(subgroup2)
-
   list(
-    label = paste(s1$label, s2$label),
+    label = label,
     filter = function(df) {
-      out <- s1$filter(df)
-      s2$filter(out)
+      out <- group_spec$filter(df)
+      subgroup_spec$filter(out)
     }
   )
 }
 
 # ---- scaling ----
 
-.compute_scale_spec_rf <- function(df, policy_vec, breaks = seq(0, 1, by = 0.05)) {
-  .check_required_cols(df, policy_vec, context = "RF scaling")
+.compute_scale_spec_pred <- function(df, policy_vec, breaks = .DEFAULT_HEAT_BREAKS) {
+  .check_required_cols(df, policy_vec, context = "predicted-score scaling")
 
   x <- df[[policy_vec[1]]]
   y <- df[[policy_vec[2]]]
@@ -246,39 +251,12 @@
   )
 }
 
-.compute_scale_spec_raw <- function(df, policy_vec) {
-  .check_required_cols(df, policy_vec, context = "Raw scaling")
-
-  x <- df[[policy_vec[1]]]
-  y <- df[[policy_vec[2]]]
-
-  if (all(is.na(x)) || all(is.na(y))) {
-    return(list(max_freq = NA_integer_, total = 0L, empty = TRUE))
-  }
-
-  ok <- !is.na(x) & !is.na(y)
-  if (!any(ok)) {
-    return(list(max_freq = NA_integer_, total = 0L, empty = TRUE))
-  }
-
-  fx <- factor(x[ok])
-  fy <- factor(y[ok])
-  ft <- as.data.frame(table(fx, fy))
-
-  list(
-    max_freq = max(ft$Freq, na.rm = TRUE),
-    total    = sum(ft$Freq, na.rm = TRUE),
-    empty    = FALSE
-  )
-}
-
-.compute_scale_specs <- function(df_year_list, panels, type,
+.compute_scale_specs <- function(df_year_list, panels,
                                  policy_vec,
                                  scale = c("across_years", "within_year"),
                                  scale_ref = c("population", "panel"),
                                  scale_ref_panel = 1L,
-                                 breaks = seq(0, 1, by = 0.05)) {
-  type  <- match.arg(type,  c("raw", "rf"))
+                                 breaks = .DEFAULT_HEAT_BREAKS) {
   scale <- match.arg(scale, c("across_years", "within_year"))
   scale_ref <- match.arg(scale_ref, c("population", "panel"))
 
@@ -288,16 +266,11 @@
   specs <- vector("list", n_panels)
   for (r in seq_len(n_panels)) specs[[r]] <- vector("list", n_years)
 
-  compute_one <- function(df) {
-    if (type == "rf") .compute_scale_spec_rf(df, policy_vec, breaks = breaks)
-    else               .compute_scale_spec_raw(df, policy_vec)
-  }
-
   get_ref_df <- function(df_year) {
     if (scale_ref == "population") return(df_year)
     idx <- as.integer(scale_ref_panel)
     if (is.na(idx) || idx < 1 || idx > length(panels)) {
-      stop("Invalid scale_ref_panel index.", call. = FALSE)
+      stop("Invalid scale reference panel index.", call. = FALSE)
     }
     .apply_panel_filter(df_year, panels[[idx]])
   }
@@ -305,7 +278,7 @@
   if (scale == "within_year") {
     for (c in seq_len(n_years)) {
       ref_df   <- get_ref_df(df_year_list[[c]])
-      ref_spec <- compute_one(ref_df)
+      ref_spec <- .compute_scale_spec_pred(ref_df, policy_vec, breaks = breaks)
       for (r in seq_len(n_panels)) specs[[r]][[c]] <- ref_spec
     }
     return(specs)
@@ -314,8 +287,8 @@
   ref_specs_by_year <- vector("list", n_years)
   for (c in seq_len(n_years)) {
     ref_df <- get_ref_df(df_year_list[[c]])
-    .check_required_cols(ref_df, policy_vec, context = "scale reference (across_years)")
-    ref_specs_by_year[[c]] <- compute_one(ref_df)
+    .check_required_cols(ref_df, policy_vec, context = "scale reference (across years)")
+    ref_specs_by_year[[c]] <- .compute_scale_spec_pred(ref_df, policy_vec, breaks = breaks)
   }
 
   nonempty <- vapply(ref_specs_by_year, function(s) !is.null(s$empty) && !isTRUE(s$empty), logical(1))
@@ -341,10 +314,12 @@
 
 # ---- panel drawing ----
 
-.draw_panel_rf <- function(df, policy_vec, scale_spec,
-                           breaks = seq(0, 1, by = 0.05),
-                           low = "#c6dbef", mid = "#F4B811", high = "#CC2929") {
-  .check_required_cols(df, policy_vec, context = "RF panel drawing")
+.draw_panel_pred <- function(df, policy_vec, scale_spec,
+                             breaks = .DEFAULT_HEAT_BREAKS,
+                             low = .DEFAULT_LOW_COLOR,
+                             mid = .DEFAULT_MID_COLOR,
+                             high = .DEFAULT_HIGH_COLOR) {
+  .check_required_cols(df, policy_vec, context = "predicted-score panel drawing")
 
   ok <- .usable_xy(df, policy_vec)
   if (!any(ok)) return(.blank_panel())
@@ -384,60 +359,13 @@
     ggplot2::coord_equal()
 }
 
-.draw_panel_raw <- function(df, policy_vec, scale_spec,
-                            low = "#c6dbef", mid = "#F4B811", high = "#CC2929",
-                            total_size = 12) {
-  .check_required_cols(df, policy_vec, context = "Raw panel drawing")
-
-  ok <- .usable_xy(df, policy_vec)
-  if (!any(ok)) return(.blank_panel())
-
-  if (!is.null(scale_spec$empty) && isTRUE(scale_spec$empty)) return(.blank_panel())
-  if (is.null(scale_spec$total) || scale_spec$total <= 0) return(.blank_panel())
-  if (is.null(scale_spec$max_freq) || is.na(scale_spec$max_freq) || scale_spec$max_freq <= 0) return(.blank_panel())
-
-  fx <- factor(df[[policy_vec[1]]][ok])
-  fy <- factor(df[[policy_vec[2]]][ok])
-
-  ft <- as.data.frame(table(fx, fy))
-  names(ft) <- c("col1", "col2", "Freq")
-  ft$prop <- ft$Freq / scale_spec$total
-  ft$prop_scaled <- sqrt(ft$prop) * total_size
-
-  ggplot2::ggplot(ft, ggplot2::aes(x = col1, y = col2, color = Freq, size = prop_scaled)) +
-    ggplot2::geom_point() +
-    ggplot2::scale_color_gradient2(
-      midpoint = 0.5 * scale_spec$max_freq,
-      low = low, mid = mid, high = high
-    ) +
-    ggplot2::scale_size_continuous(range = c(0, max(ft$prop_scaled, na.rm = TRUE))) +
-    ggplot2::theme(
-      legend.position = "none",
-      panel.border = ggplot2::element_blank(),
-      panel.grid.major = ggplot2::element_line(colour = "lightgrey"),
-      panel.grid.minor = ggplot2::element_blank(),
-      axis.line = ggplot2::element_blank(),
-      axis.title.x = ggplot2::element_blank(),
-      axis.title.y = ggplot2::element_blank(),
-      panel.background = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_blank(),
-      axis.ticks.x = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_blank(),
-      axis.ticks.y = ggplot2::element_blank()
-    ) +
-    ggplot2::coord_equal()
+.draw_panel <- function(df, policy_vec, scale_spec, breaks = .DEFAULT_HEAT_BREAKS) {
+  .draw_panel_pred(df, policy_vec, scale_spec, breaks = breaks)
 }
 
-.draw_panel <- function(df, type, policy_vec, scale_spec, breaks = seq(0, 1, by = 0.05)) {
-  type <- match.arg(type, c("raw", "rf"))
-  if (type == "rf") .draw_panel_rf(df, policy_vec, scale_spec, breaks = breaks)
-  else                .draw_panel_raw(df, policy_vec, scale_spec)
-}
+# ---- single heatmap + marginals ----
 
-
-# ---- single RF heatmap + marginals ----
-
-.single_pred_counts <- function(df, policy_vec, breaks = seq(0, 1, by = 0.05)) {
+.single_pred_counts <- function(df, policy_vec, breaks = .DEFAULT_HEAT_BREAKS) {
   .check_required_cols(df, policy_vec, context = "single predicted heatmap")
 
   ok <- .usable_xy(df, policy_vec)
@@ -472,14 +400,13 @@
   )
 }
 
-.draw_single_rf_heatmap_with_marginals <- function(df,
-                                                   policy_vec,
-                                                   breaks = seq(0, 1, by = 0.05),
-                                                   title = NULL,
-                                                   subtitle = NULL,
-                                                   low = "#c6dbef",
-                                                   mid = "#F4B811",
-                                                   high = "#CC2929") {
+.draw_single_pred_heatmap_with_marginals <- function(df,
+                                                     policy_vec,
+                                                     breaks = .DEFAULT_HEAT_BREAKS,
+                                                     title = NULL,
+                                                     low = .DEFAULT_LOW_COLOR,
+                                                     mid = .DEFAULT_MID_COLOR,
+                                                     high = .DEFAULT_HIGH_COLOR) {
   if (!requireNamespace("gridExtra", quietly = TRUE)) {
     stop("Package 'gridExtra' is required. Install it with install.packages('gridExtra').", call. = FALSE)
   }
@@ -489,7 +416,7 @@
 
   counts <- .single_pred_counts(df, policy_vec, breaks = breaks)
   if (is.null(counts)) {
-    stop("No non-missing observations available for the requested year/panel/policies.", call. = FALSE)
+    stop("No non-missing observations available for the requested year/group/policies.", call. = FALSE)
   }
 
   heat_df <- counts$heat
@@ -510,7 +437,7 @@
 
     p <- ggplot2::ggplot(dfz, ggplot2::aes(x = z)) +
       ggplot2::geom_histogram(
-        ggplot2::aes(y = after_stat(density)),
+        ggplot2::aes(y = ggplot2::after_stat(density)),
         breaks = breaks,
         fill = "ivory4",
         color = "grey35",

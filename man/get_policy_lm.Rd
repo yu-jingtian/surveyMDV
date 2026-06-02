@@ -2,7 +2,7 @@
 % Please edit documentation in R/get_data.R
 \name{get_policy_lm}
 \alias{get_policy_lm}
-\title{Get LM-predicted policy scores (2014–2021)}
+\title{Get LM-predicted policy scores (2014--2021)}
 \usage{
 get_policy_lm(year = NULL, cols = NULL)
 }
@@ -15,5 +15,5 @@ get_policy_lm(year = NULL, cols = NULL)
 A data frame containing LM-predicted policy scores.
 }
 \description{
-Get LM-predicted policy scores (2014–2021)
+Get LM-predicted policy scores (2014--2021)
 }

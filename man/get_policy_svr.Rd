@@ -2,7 +2,7 @@
 % Please edit documentation in R/get_data.R
 \name{get_policy_svr}
 \alias{get_policy_svr}
-\title{Get SVR-predicted policy scores (2014–2021)}
+\title{Get SVR-predicted policy scores (2014--2021)}
 \usage{
 get_policy_svr(year = NULL, cols = NULL)
 }
@@ -15,5 +15,5 @@ get_policy_svr(year = NULL, cols = NULL)
 A data frame containing SVR-predicted policy scores.
 }
 \description{
-Get SVR-predicted policy scores (2014–2021)
+Get SVR-predicted policy scores (2014--2021)
 }

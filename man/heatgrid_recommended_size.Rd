@@ -13,11 +13,11 @@ heatgrid_recommended_size(
 )
 }
 \arguments{
-\item{plot}{A plot returned by \code{plot_policy_heatgrid()}.}
+\item{plot}{A plot returned by a heatmap-grid function.}
 
-\item{cell_width}{Width, in inches, allocated to each retained year column.}
+\item{cell_width}{Width, in inches, allocated to each plot column.}
 
-\item{cell_height}{Height, in inches, allocated to each panel row.}
+\item{cell_height}{Height, in inches, allocated to each plot row.}
 
 \item{min_width, min_height}{Lower bounds for the suggested figure size.}
 }
@@ -26,5 +26,5 @@ A named numeric vector with \code{width} and \code{height}.
 }
 \description{
 Computes a suggested \code{ggsave()} width and height from the number of
-years that are actually kept after dropping years with missing policy data.
+columns and rows in a plotted heatmap grid.
 }

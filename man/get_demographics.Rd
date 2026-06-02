@@ -2,12 +2,12 @@
 % Please edit documentation in R/get_data.R
 \name{get_demographics}
 \alias{get_demographics}
-\title{Get respondent demographics (2014–2021)}
+\title{Get respondent demographics (2014--2021)}
 \usage{
 get_demographics(year = NULL, cols = NULL)
 }
 \arguments{
-\item{year}{Integer vector of survey years to keep. Default \code{NULL} keeps all years (2014--2021).}
+\item{year}{Integer vector of survey years to keep. Default \code{NULL} keeps all years.}
 
 \item{cols}{Character vector of column names to return. Default \code{NULL} returns all columns.
 Note: \code{case_id} and \code{year} are always included to support joins.}

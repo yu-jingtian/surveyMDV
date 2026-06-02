@@ -2,62 +2,26 @@
 % Please edit documentation in R/heat_wrappers.R
 \name{plot_policy_heatrow_year}
 \alias{plot_policy_heatrow_year}
-\title{Single-year heatmap row for a policy pair}
+\title{Heatmap row for one year}
 \usage{
 plot_policy_heatrow_year(
   year,
   policy_x,
   policy_y,
-  type = c("rf", "raw"),
-  panels = panels_partisan(),
-  scale_ref = c("population", "panel"),
-  scale_ref_panel = 1L,
-  breaks = seq(0, 1, by = 0.05),
-  show_policy_axes = TRUE,
-  policy_axis_title_size = 16,
-  policy_axis_tick_size = 9,
-  policy_axis_tick_pad = 0.06
+  model = c("rf", "xgb", "lm", "svr")
 )
 }
 \arguments{
 \item{year}{Single integer year.}
 
-\item{policy_x, policy_y}{Policy variable names. For \code{type="raw"}, use raw names
-(e.g., \code{"abortion"}). For \code{type="rf"}, you may pass base names
-(e.g., \code{"abortion"}) or suffixed names (e.g., \code{"abortion_rf"}).}
+\item{policy_x, policy_y}{Base policy names.}
 
-\item{type}{One of \code{"rf"} or \code{"raw"}.}
-
-\item{panels}{A panel specification list. Default is \code{panels_partisan()}.}
-
-\item{scale_ref}{Scaling reference: \code{"population"} (default) or \code{"panel"}.}
-
-\item{scale_ref_panel}{Integer panel index used when \code{scale_ref="panel"}.}
-
-\item{breaks}{Numeric breaks used for RF binning (ignored for raw). Default is \code{seq(0,1,0.05)}.}
-
-\item{show_policy_axes}{Logical; if \code{TRUE}, add one shared outer x-axis and y-axis
-with policy-specific tick labels and policy titles.}
-
-\item{policy_axis_title_size}{Font size for shared policy-axis titles.}
-
-\item{policy_axis_tick_size}{Font size for shared policy-axis tick labels.}
-
-\item{policy_axis_tick_pad}{Padding used to move edge tick labels inward and
-avoid clipping in the saved figure.}
+\item{model}{Prediction model used for the plotted scores.}
 }
 \value{
-A grob containing the heatmap row and shared policy axes when
-\code{show_policy_axes = TRUE}; otherwise a \code{GGally} \code{ggmatrix} object.
+A grob containing the heatmap row and shared policy axes.
 }
 \description{
-Creates a one-row heatmap grid for a single year. By default, the row shows
-Population, Republican, Independent, and Democrat panels. This is equivalent
-to taking one year-column from \code{plot_policy_heatgrid()} and laying the
-panels out horizontally.
-}
-\details{
-The plot has no main title and no year strip. Panel labels are shown as
-column strips above each subplot. Shared outer policy-axis titles and
-policy-specific tick labels follow the same rule as \code{plot_policy_heatgrid()}.
+Draws the one-row partisan decomposition for a single year. The columns are
+Population, Republican, Independent, and Democrat.
 }

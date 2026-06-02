@@ -2,64 +2,30 @@
 % Please edit documentation in R/heat_wrappers.R
 \name{plot_policy_heatgrid}
 \alias{plot_policy_heatgrid}
-\title{Multiyear (or single-year) heatmap grid for a policy pair}
+\title{Advanced heatmap grid}
 \usage{
 plot_policy_heatgrid(
   years,
   policy_x,
   policy_y,
-  type = c("rf", "raw"),
-  panels = panels_partisan(),
-  scale = c("across_years", "within_year"),
-  scale_ref = c("population", "panel"),
-  scale_ref_panel = 1L,
-  breaks = seq(0, 1, by = 0.05),
-  show_policy_axes = TRUE,
-  policy_axis_title_size = 16,
-  policy_axis_tick_size = 9,
-  policy_axis_tick_pad = 0.06
+  model = c("rf", "xgb", "lm", "svr"),
+  panels = panels_partisan()
 )
 }
 \arguments{
-\item{years}{Integer vector of years (2014--2021).}
+\item{years}{Integer vector of years.}
 
-\item{policy_x, policy_y}{Policy variable names. For \code{type="raw"}, use raw names
-(e.g., \code{"abortion"}). For \code{type="rf"}, you may pass base names (e.g., \code{"abortion"})
-or suffixed names (e.g., \code{"abortion_rf"}); base names will be converted to \code{*_rf}.}
+\item{policy_x, policy_y}{Base policy names.}
 
-\item{type}{One of \code{"rf"} or \code{"raw"}.}
+\item{model}{Prediction model used for the plotted scores.}
 
-\item{panels}{A panel specification list, e.g. \code{panels_partisan()},
-\code{panels_rep_decompose()}, \code{panels_dem_decompose()}, \code{panels_ind_decompose()}.}
-
-\item{scale}{One of \code{"across_years"} (default) or \code{"within_year"}.}
-
-\item{scale_ref}{Scaling reference: \code{"population"} (default) or \code{"panel"}.}
-
-\item{scale_ref_panel}{Integer panel index used when \code{scale_ref="panel"} (default 1).}
-
-\item{breaks}{Numeric breaks used for RF binning (ignored for raw). Default is \code{seq(0,1,0.05)}.}
-
-\item{show_policy_axes}{Logical; if \code{TRUE}, add one shared outer x-axis and y-axis
-with policy-specific tick labels and policy titles.}
-
-\item{policy_axis_title_size}{Font size for shared policy-axis titles.}
-
-\item{policy_axis_tick_size}{Font size for shared policy-axis tick labels.}
-
-\item{policy_axis_tick_pad}{Padding used to move edge tick labels inward and
-avoid clipping in the saved figure.}
+\item{panels}{Panel specification list, such as \code{panels_partisan()}.}
 }
 \value{
-A grob containing the heatmap grid and shared policy axes when
-\code{show_policy_axes = TRUE}; otherwise a \code{GGally} \code{ggmatrix} object.
+A grob containing the heatmap grid and shared policy axes.
 }
 \description{
-Creates a grid of heatmaps comparing \code{years} (columns) across subgroup panels (rows),
-for a pair of policy dimensions. Works for either raw scores (\code{type = "raw"}) or
-RF-predicted scores (\code{type = "rf"}).
-}
-\details{
-If a year has no data for either requested policy (i.e., the relevant column is all \code{NA}
-for that year), the entire year column is removed from the plot and a warning is issued.
+Draws a multi-year heatmap grid with a user-supplied panel specification.
+Most users should prefer \code{plot_policy_partisan_grid()} or
+\code{plot_policy_subgroup_grid()}.
 }

@@ -3,7 +3,7 @@
 \docType{data}
 \name{policy_lm}
 \alias{policy_lm}
-\title{Linear-model predicted policy scores by year (2014–2021)}
+\title{Linear-model predicted policy scores by year (2014--2021)}
 \format{
 A data frame with \code{case_id}, \code{year}, and policy columns
 suffixed with \code{_lm}.

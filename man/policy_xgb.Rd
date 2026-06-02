@@ -3,7 +3,7 @@
 \docType{data}
 \name{policy_xgb}
 \alias{policy_xgb}
-\title{XGB predicted policy scores by year (2014–2021)}
+\title{XGB predicted policy scores by year (2014--2021)}
 \format{
 A data frame with \code{case_id}, \code{year}, and policy columns
 suffixed with \code{_xgb}.

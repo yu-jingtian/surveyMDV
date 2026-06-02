@@ -2,7 +2,7 @@
 % Please edit documentation in R/get_data.R
 \name{get_policy_xgb}
 \alias{get_policy_xgb}
-\title{Get XGB-predicted policy scores (2014–2021)}
+\title{Get XGB-predicted policy scores (2014--2021)}
 \usage{
 get_policy_xgb(year = NULL, cols = NULL)
 }
@@ -15,5 +15,5 @@ get_policy_xgb(year = NULL, cols = NULL)
 A data frame containing XGB-predicted policy scores.
 }
 \description{
-Get XGB-predicted policy scores (2014–2021)
+Get XGB-predicted policy scores (2014--2021)
 }

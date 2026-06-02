@@ -2,41 +2,41 @@
 % Please edit documentation in R/heat_wrappers.R
 \name{plot_policy_heat_single}
 \alias{plot_policy_heat_single}
-\title{Single-year RF heatmap with marginals}
+\title{Single heatmap with marginal distributions}
 \usage{
 plot_policy_heat_single(
   year,
   policy_x,
   policy_y,
   model = c("rf", "xgb", "lm", "svr"),
-  subgroup1 = NULL,
-  subgroup2 = NULL,
-  panel = NULL,
-  breaks = seq(0, 1, by = 0.05),
+  group = "population",
+  subgroup = NULL,
   title = NULL
 )
 }
 \arguments{
-\item{year}{Integer year.}
+\item{year}{Single integer year.}
 
-\item{policy_x, policy_y}{RF policy names. You may pass base names
-like "guns" and "enviro", or suffixed names like "guns_rf".}
+\item{policy_x, policy_y}{Base policy names, such as \code{"immig"},
+\code{"trade"}, \code{"enviro"}, or \code{"guns"}. Suffixed names such as
+\code{"immig_rf"} are also accepted and will be converted to the selected model.}
 
-\item{subgroup1}{Optional first subgroup label, e.g. "Rep.", "college", "metro".}
+\item{model}{Prediction model used for the plotted scores. One of
+\code{"rf"}, \code{"xgb"}, \code{"lm"}, or \code{"svr"}.}
 
-\item{subgroup2}{Optional second subgroup label for an interaction, e.g. "Rep." and "college".}
+\item{group}{Main group to plot. One of \code{"population"},
+\code{"republican"}, \code{"independent"}, or \code{"democrat"}.}
 
-\item{panel}{Optional panel specification for backward compatibility. When supplied,
-it overrides \code{subgroup1} and \code{subgroup2}.}
+\item{subgroup}{Optional subgroup within \code{group}. Supported values include
+\code{"college"}, \code{"non-college"}, \code{"metro"}, \code{"non-metro"},
+\code{"female"}, and \code{"male"}.}
 
-\item{breaks}{RF score bin edges. Default seq(0,1,0.05).}
-
-\item{title}{Optional custom title.}
+\item{title}{Optional custom title. If \code{NULL}, a default title is used.}
 }
 \value{
 A grid grob.
 }
 \description{
-Draw a single-year RF heatmap for one policy pair, with a left y-marginal
-and a bottom x-marginal.
+Draws one model-predicted policy heatmap for a single year and group, with
+marginal histograms and density curves.
 }

@@ -17,7 +17,7 @@ save_policy_heatgrid(
 \arguments{
 \item{filename}{Output file name.}
 
-\item{plot}{A plot returned by \code{plot_policy_heatgrid()}.}
+\item{plot}{A plot returned by a heatmap-grid function.}
 
 \item{width, height}{Optional output dimensions. If omitted, dimensions are
 computed by \code{heatgrid_recommended_size(plot)}.}
@@ -32,7 +32,5 @@ computed by \code{heatgrid_recommended_size(plot)}.}
 Invisibly returns the size used.
 }
 \description{
-This is a thin wrapper around \code{ggplot2::ggsave()} that uses the number
-of retained years, rather than the number of requested years, to choose the
-output dimensions.
+This is a thin wrapper around \code{ggplot2::ggsave()}.
 }

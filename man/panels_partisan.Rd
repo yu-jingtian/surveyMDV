@@ -2,7 +2,7 @@
 % Please edit documentation in R/panels_presets.R
 \name{panels_partisan}
 \alias{panels_partisan}
-\title{Preset panels: Population + three parties}
+\title{Preset panels: Population plus three party groups}
 \usage{
 panels_partisan()
 }
@@ -10,5 +10,7 @@ panels_partisan()
 A list of panel specifications, each with elements \code{label} and \code{filter}.
 }
 \description{
-Returns the standard four-row panel set: Population, Republican, Independent, Democrat.
+Returns the standard four-panel set: Population, Republican, Independent,
+and Democrat. Most users can call \code{plot_policy_partisan_grid()} or
+\code{plot_policy_heatrow_year()} directly instead of using this helper.
 }
