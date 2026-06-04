@@ -154,14 +154,6 @@ Below are examples of visualization outputs:
 <table>
   <tr>
     <td>
-      <img src="figs/raw_enviro_guns_2020.jpeg" width="100%">
-    </td>
-    <td>
-      <b>Raw 2D Score Map.</b> Single-year visualization of observed raw policy-score combinations. The central frequency scatter map shows empirical joint proportions through point size and color, while the side bars show discrete marginal distributions.
-    </td>
-  </tr>
-  <tr>
-    <td>
       <img src="figs/heatgrid_abortion_healthcare.jpeg" width="100%">
     </td>
     <td>
