@@ -1,5 +1,44 @@
 # R/get_data.R
-# User-facing data accessors for model-predicted policy scores and demographics.
+# User-facing data accessors for raw/model-predicted policy scores and demographics.
+
+#' Get raw policy scores (2014--2021)
+#'
+#' Loads and returns the raw policy score table, optionally filtered by year and
+#' reduced to selected columns. Raw policy scores are normalized to the
+#' \code{[0, 1]} interval.
+#'
+#' @param year Integer vector of survey years to keep. Default \code{NULL} keeps all years.
+#' @param cols Character vector of column names to return. Default \code{NULL} returns all columns.
+#'   Note: \code{case_id} and \code{year} are always included to support joins.
+#'
+#' @return A data frame containing raw policy scores.
+#' @export
+get_policy_raw <- function(year = NULL, cols = NULL) {
+  utils::data("policy_raw", package = "surveyMDV", envir = environment())
+
+  df <- policy_raw
+
+  if (!is.null(year)) {
+    year <- as.integer(year)
+    df <- df[df$year %in% year, , drop = FALSE]
+  }
+
+  if (!is.null(cols)) {
+    cols <- unique(as.character(cols))
+    keep <- unique(c("case_id", "year", cols))
+    missing_cols <- setdiff(keep, names(df))
+    if (length(missing_cols) > 0) {
+      stop("Unknown column(s) in `cols`: ", paste(missing_cols, collapse = ", "), call. = FALSE)
+    }
+    df <- df[, keep, drop = FALSE]
+  }
+
+  if (nrow(df) == 0) {
+    stop("No rows returned. Check `year` (available: 2014--2021) and your filters.", call. = FALSE)
+  }
+
+  df
+}
 
 .get_policy_pred <- function(dataset_name, year = NULL, cols = NULL) {
   utils::data(list = dataset_name, package = "surveyMDV", envir = environment())

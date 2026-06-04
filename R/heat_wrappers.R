@@ -613,5 +613,60 @@ plot_policy_heatgrid <- function(years,
   )
 }
 
+#' Single-year raw policy frequency scatter plot with marginal distributions
+#'
+#' Draws one raw-score policy-pair plot for a single year. The central panel
+#' follows a frequency-scatter design: each point is one observed raw-score
+#' combination, and both point color and point size represent the empirical
+#' joint proportion. The side panels show discrete marginal proportions using
+#' \code{geom_col()}. The raw-score scatter and marginal bars use only
+#' observed factor levels; the substantive axis labels are drawn separately at
+#' normalized raw-score positions 0, 0.5, and 1, so no artificial 0.5 factor
+#' level is inserted when that value is absent in the data.
+#'
+#' @param year Single integer year.
+#' @param policy_x,policy_y Raw policy names, such as \code{"immig"},
+#'   \code{"trade"}, \code{"enviro"}, or \code{"guns"}. Model suffixes such as
+#'   \code{"_rf"} are stripped if supplied.
+#' @param title Optional custom title. If \code{NULL}, a default title is used.
+#' @param point_size_multiplier Positive numeric multiplier controlling the
+#'   point-size scale in the central raw frequency-scatter panel. Larger values
+#'   make the dots larger.
+#'
+#' @return A grid grob.
+#' @export
+plot_policy_raw_single <- function(year,
+                                   policy_x,
+                                   policy_y,
+                                   title = NULL,
+                                   point_size_multiplier = 80) {
+  year <- as.integer(year)
+  if (length(year) != 1 || is.na(year)) {
+    stop("`year` must be a single integer.", call. = FALSE)
+  }
+
+  policy_vec <- .resolve_raw_policy_names(policy_x = policy_x, policy_y = policy_y)
+  df <- .prepare_raw_year_df(year)
+
+  .check_required_cols(df, policy_vec, context = "single raw policy plot")
+  if (nrow(df) == 0) {
+    stop("No observations remain for the requested year.", call. = FALSE)
+  }
+  if (all(is.na(df[[policy_vec[1]]])) || all(is.na(df[[policy_vec[2]]]))) {
+    stop("At least one requested raw policy column is entirely NA for this year.", call. = FALSE)
+  }
+
+  if (is.null(title)) {
+    title <- paste0(year, ", Raw scores")
+  }
+
+  .draw_single_raw_scatter_with_marginals(
+    df = df,
+    policy_vec = policy_vec,
+    title = title,
+    point_size_multiplier = point_size_multiplier
+  )
+}
+
 # Backward-compatible alias for old code that used the RF-specific name.
 plot_policy_heat_single_rf <- plot_policy_heat_single

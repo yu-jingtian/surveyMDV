@@ -23,15 +23,16 @@ This installs the package along with its required dependencies (e.g., ggplot2, d
 
 ### Load packaged data (2014–2021)
 
-The package ships with model-predicted respondent-level policy score datasets covering survey years 2014–2021:
+The package ships with respondent-level policy score datasets covering survey years 2014–2021:
 
-- `policy_rf`: random-forest predicted policy scores
-- `policy_xgb`: XGB predicted policy scores
-- `policy_lm`: linear-model predicted policy scores
-- `policy_svr`: support-vector-regression predicted policy scores
+- `policy_rf`: random-forest estimated policy scores
+- `policy_xgb`: XGB estimated policy scores
+- `policy_lm`: linear-model estimated policy scores
+- `policy_svr`: support-vector-regression estimated policy scores
+- `policy_raw`: raw policy scores normalized to the `[0, 1]` interval
 - `demographics`: respondent demographics and survey weights
 
-Each dataset includes the keys case_id and year, which can be used for merging.
+The model-estimated datasets contain policy scores with model suffixes such as `_rf`, `_xgb`, `_lm`, and `_svr`. The raw-score dataset uses the base policy names directly, such as `immig`, `enviro`, `guns`, and `healthcare`. Each dataset includes the keys `case_id` and `year`, which can be used for merging.
 
 You can load the full datasets directly:
 
@@ -40,6 +41,7 @@ data("policy_rf", package = "surveyMDV")
 data("policy_xgb", package = "surveyMDV")
 data("policy_lm", package = "surveyMDV")
 data("policy_svr", package = "surveyMDV")
+data("policy_raw", package = "surveyMDV")
 data("demographics", package = "surveyMDV")
 ```
 
@@ -56,6 +58,11 @@ demo_2016 <- get_demographics(
   year = 2016,
   cols = c("partisan", "race", "gender", "weight_cumulative")
 )
+
+raw_2016 <- get_policy_raw(
+  year = 2016,
+  cols = c("immig", "guns")
+)
 ```
 
 Datasets are designed to be joined using case_id and year:
@@ -71,12 +78,12 @@ df <- get_policy_predicted(model = "rf") |>
 
 This merged table can be used directly for visualization, subgroup analysis, or model-based summaries as described in the paper.
 
-### Example: four main visualization styles
+### Example: main visualization styles
 
-The plotting functions use model-predicted policy scores. Supported models are `"rf"`, `"xgb"`, `"lm"`, and `"svr"`. Policy names can be provided as base names, such as `"immig"`, `"trade"`, `"healthcare"`, or `"abortion"`; the selected model suffix is resolved internally.
+Most plotting functions use model-estimated policy scores. Supported models are `"rf"`, `"xgb"`, `"lm"`, and `"svr"`. Policy names can be provided as base names, such as `"immig"`, `"trade"`, `"healthcare"`, or `"abortion"`; the selected model suffix is resolved internally.
 
 ```r
-# 1) Single heatmap with marginal distributions
+# 1) Single estimation-based heatmap with marginal distributions
 p1 <- plot_policy_heat_single(
   year = 2019,
   policy_x = "immig",
@@ -89,23 +96,24 @@ p1
 ```
 
 ```r
-# 2) One-year heatmap row: Population / Republican / Independent / Democrat
-p2 <- plot_policy_heatrow_year(
-  year = 2021,
-  policy_x = "healthcare",
-  policy_y = "abortion",
-  model = "rf"
+# 2) Raw 2D score map with discrete marginal distributions
+# The central panel is a frequency scatter map:
+# point size and color represent the empirical joint proportion.
+p2 <- plot_policy_raw_single(
+  year = 2020,
+  policy_x = "enviro",
+  policy_y = "guns"
 )
 
 p2
 ```
 
 ```r
-# 3) Multi-year partisan decomposition of the population
-p3 <- plot_policy_partisan_grid(
-  years = 2019:2021,
-  policy_x = "abortion",
-  policy_y = "healthcare",
+# 3) One-year heatmap row: Population / Republican / Independent / Democrat
+p3 <- plot_policy_heatrow_year(
+  year = 2021,
+  policy_x = "healthcare",
+  policy_y = "abortion",
   model = "rf"
 )
 
@@ -113,8 +121,20 @@ p3
 ```
 
 ```r
-# 4) Multi-year subgroup analysis for the population or one partisan group
-p4 <- plot_policy_subgroup_grid(
+# 4) Multi-year partisan decomposition of the population
+p4 <- plot_policy_partisan_grid(
+  years = 2019:2021,
+  policy_x = "abortion",
+  policy_y = "healthcare",
+  model = "rf"
+)
+
+p4
+```
+
+```r
+# 5) Multi-year subgroup analysis for the population or one partisan group
+p5 <- plot_policy_subgroup_grid(
   years = 2014:2021,
   policy_x = "enviro",
   policy_y = "guns",
@@ -122,7 +142,7 @@ p4 <- plot_policy_subgroup_grid(
   group = "republican"
 )
 
-p4
+p5
 ```
 
 ---
@@ -132,6 +152,14 @@ p4
 Below are examples of visualization outputs:
 
 <table>
+  <tr>
+    <td>
+      <img src="figs/raw_enviro_guns_2020.jpeg" width="100%">
+    </td>
+    <td>
+      <b>Raw 2D Score Map.</b> Single-year visualization of observed raw policy-score combinations. The central frequency scatter map shows empirical joint proportions through point size and color, while the side bars show discrete marginal distributions.
+    </td>
+  </tr>
   <tr>
     <td>
       <img src="figs/heatgrid_abortion_healthcare.jpeg" width="100%">

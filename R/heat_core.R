@@ -29,6 +29,18 @@
   c(normalize_one(policy_x), normalize_one(policy_y))
 }
 
+.resolve_raw_policy_names <- function(policy_x, policy_y) {
+  normalize_one <- function(x) {
+    x <- as.character(x)
+    x <- sub("_pred_(rf|xgb|lm|svr)$", "", x)
+    x <- sub("_pred$", "", x)
+    x <- sub("_(rf|xgb|lm|svr|raw)$", "", x)
+    x
+  }
+
+  c(normalize_one(policy_x), normalize_one(policy_y))
+}
+
 .check_required_cols <- function(df, cols, context = "") {
   missing <- setdiff(cols, names(df))
   if (length(missing) > 0) {
@@ -113,6 +125,11 @@
   demo <- get_demographics(year = year, cols = NULL)
 
   merge(pol, demo, by = c("case_id", "year"), all = FALSE)
+}
+
+.prepare_raw_year_df <- function(year) {
+  year <- as.integer(year)
+  get_policy_raw(year = year, cols = NULL)
 }
 
 .apply_panel_filter <- function(df, panel) {
@@ -587,3 +604,368 @@
 
   g
 }
+
+# ---- single raw frequency scatter + discrete marginals ----
+
+.format_raw_score <- function(z) {
+  z <- round(as.numeric(z), 10)
+  format(z, trim = TRUE, scientific = FALSE)
+}
+
+.raw_score_levels <- function(z) {
+  z <- z[!is.na(z)]
+  if (length(z) == 0) return(character(0))
+
+  if (is.numeric(z) || is.integer(z)) {
+    # Use observed raw-score levels only. Do not insert 0.5 as a fake factor
+    # level, because that creates an artificial empty slot/gap in the
+    # frequency-scatter panel and in the marginal bar plot.
+    vals <- sort(unique(round(as.numeric(z), 10)))
+    return(.format_raw_score(vals))
+  }
+
+  sort(unique(as.character(z)))
+}
+
+.raw_score_factor <- function(z, levels) {
+  if (is.numeric(z) || is.integer(z)) {
+    z <- .format_raw_score(z)
+  } else {
+    z <- as.character(z)
+  }
+
+  factor(z, levels = levels, ordered = TRUE)
+}
+
+.raw_tick_labels <- function(levels, policy_name) {
+  if (length(levels) == 0) return(character(0))
+
+  nums <- suppressWarnings(as.numeric(levels))
+  if (all(is.na(nums))) return(levels)
+
+  out <- rep("", length(levels))
+  policy_labs <- .policy_tick_labels(policy_name)
+  targets <- c(0, 0.5, 1)
+
+  for (i in seq_along(targets)) {
+    idx <- which(abs(nums - targets[i]) < 1e-8)
+    if (length(idx) >= 1) {
+      out[idx[1]] <- policy_labs[i]
+    }
+  }
+
+  out
+}
+
+.raw_target_positions <- function(levels, targets = c(0, 0.5, 1)) {
+  n <- length(levels)
+  if (n == 0) return(rep(NA_real_, length(targets)))
+
+  nums <- suppressWarnings(as.numeric(as.character(levels)))
+  if (all(is.na(nums))) {
+    # Non-numeric fallback: use evenly spaced positions across the observed
+    # factor levels. Raw policy scores should normally be numeric, so this is
+    # only a defensive fallback.
+    return(seq(1, n, length.out = length(targets)))
+  }
+
+  ok <- is.finite(nums)
+  nums <- nums[ok]
+  pos_index <- which(ok)
+  if (length(nums) == 0) return(rep(NA_real_, length(targets)))
+
+  out <- rep(NA_real_, length(targets))
+  for (i in seq_along(targets)) {
+    t <- targets[i]
+    if (!is.finite(t)) next
+
+    exact <- which(abs(nums - t) < 1e-8)
+    if (length(exact) > 0) {
+      out[i] <- pos_index[exact[1]]
+    } else if (t <= min(nums, na.rm = TRUE)) {
+      out[i] <- pos_index[which.min(nums)]
+    } else if (t >= max(nums, na.rm = TRUE)) {
+      out[i] <- pos_index[which.max(nums)]
+    } else {
+      lower <- max(which(nums < t))
+      upper <- min(which(nums > t))
+      if (is.finite(lower) && is.finite(upper) && nums[upper] != nums[lower]) {
+        frac <- (t - nums[lower]) / (nums[upper] - nums[lower])
+        out[i] <- pos_index[lower] + frac * (pos_index[upper] - pos_index[lower])
+      }
+    }
+  }
+
+  out
+}
+
+.raw_x_axis_plot <- function(levels, policy_name) {
+  n <- length(levels)
+  if (n == 0) return(.blank_panel())
+
+  breaks <- .raw_target_positions(levels)
+  labels <- .policy_tick_labels(policy_name)
+  keep <- is.finite(breaks)
+
+  ggplot2::ggplot(data.frame(x = c(0.5, n + 0.5), y = 0), ggplot2::aes(x = x, y = y)) +
+    ggplot2::geom_blank() +
+    ggplot2::scale_x_continuous(
+      limits = c(0.5, n + 0.5),
+      breaks = breaks[keep],
+      labels = labels[keep],
+      expand = c(0, 0)
+    ) +
+    ggplot2::scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    ggplot2::theme_void(base_size = 11) +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(size = .DEFAULT_AXIS_TICK_SIZE, color = "black"),
+      axis.ticks.x = ggplot2::element_blank(),
+      axis.line.x = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(0, 0, 0, 0)
+    )
+}
+
+.raw_y_axis_plot <- function(levels, policy_name) {
+  n <- length(levels)
+  if (n == 0) return(.blank_panel())
+
+  breaks <- .raw_target_positions(levels)
+  labels <- .policy_tick_labels(policy_name)
+  keep <- is.finite(breaks)
+
+  ggplot2::ggplot(data.frame(x = 0, y = c(0.5, n + 0.5)), ggplot2::aes(x = x, y = y)) +
+    ggplot2::geom_blank() +
+    ggplot2::scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    ggplot2::scale_y_continuous(
+      limits = c(0.5, n + 0.5),
+      breaks = breaks[keep],
+      labels = labels[keep],
+      expand = c(0, 0),
+      position = "right"
+    ) +
+    ggplot2::theme_void(base_size = 11) +
+    ggplot2::theme(
+      axis.text.y.right = ggplot2::element_text(
+        size = .DEFAULT_AXIS_TICK_SIZE,
+        color = "black",
+        angle = 90,
+        vjust = 0.5,
+        hjust = 0.5
+      ),
+      axis.ticks.y.right = ggplot2::element_blank(),
+      axis.line.y.right = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(0, 0, 0, 0)
+    )
+}
+
+.single_raw_counts <- function(df, policy_vec) {
+  .check_required_cols(df, policy_vec, context = "single raw policy plot")
+
+  ok <- .usable_xy(df, policy_vec)
+  if (!any(ok)) return(NULL)
+
+  x <- df[[policy_vec[1]]][ok]
+  y <- df[[policy_vec[2]]][ok]
+
+  x_levels <- .raw_score_levels(x)
+  y_levels <- .raw_score_levels(y)
+  fx <- .raw_score_factor(x, x_levels)
+  fy <- .raw_score_factor(y, y_levels)
+
+  plot_df <- data.frame(col1 = fx, col2 = fy)
+
+  heat <- stats::aggregate(
+    list(Freq = rep(1L, nrow(plot_df))),
+    by = list(col1 = plot_df$col1, col2 = plot_df$col2),
+    FUN = sum
+  )
+  heat$Freq <- heat$Freq / sum(heat$Freq)
+  heat$col1 <- factor(heat$col1, levels = x_levels, ordered = TRUE)
+  heat$col2 <- factor(heat$col2, levels = y_levels, ordered = TRUE)
+
+  x_dist <- stats::aggregate(
+    list(Freq = rep(1L, length(fx))),
+    by = list(score = fx),
+    FUN = sum
+  )
+  x_dist$Freq <- x_dist$Freq / sum(x_dist$Freq)
+  x_dist$score <- factor(x_dist$score, levels = x_levels, ordered = TRUE)
+
+  y_dist <- stats::aggregate(
+    list(Freq = rep(1L, length(fy))),
+    by = list(score = fy),
+    FUN = sum
+  )
+  y_dist$Freq <- y_dist$Freq / sum(y_dist$Freq)
+  y_dist$score <- factor(y_dist$score, levels = y_levels, ordered = TRUE)
+
+  list(
+    heat = heat,
+    x_dist = x_dist,
+    y_dist = y_dist,
+    x_levels = x_levels,
+    y_levels = y_levels,
+    n = length(fx)
+  )
+}
+
+.draw_single_raw_scatter_with_marginals <- function(df,
+                                                    policy_vec,
+                                                    title = NULL,
+                                                    low = .DEFAULT_LOW_COLOR,
+                                                    mid = .DEFAULT_MID_COLOR,
+                                                    high = .DEFAULT_HIGH_COLOR,
+                                                    point_size_multiplier = 80) {
+  if (!requireNamespace("gridExtra", quietly = TRUE)) {
+    stop("Package 'gridExtra' is required. Install it with install.packages('gridExtra').", call. = FALSE)
+  }
+  if (!requireNamespace("grid", quietly = TRUE)) {
+    stop("Package 'grid' is required.", call. = FALSE)
+  }
+
+  counts <- .single_raw_counts(df, policy_vec)
+  if (is.null(counts)) {
+    stop("No non-missing observations available for the requested year/raw policies.", call. = FALSE)
+  }
+
+  heat_df <- counts$heat
+  max_freq <- max(heat_df$Freq, na.rm = TRUE)
+  min_freq <- min(heat_df$Freq, na.rm = TRUE)
+  if (!is.finite(max_freq) || max_freq <= 0) max_freq <- 1
+  if (!is.finite(min_freq) || min_freq <= 0) min_freq <- max_freq
+
+  min_size <- (1 / 3) * point_size_multiplier * min_freq
+  max_size <- point_size_multiplier * max_freq
+  if (!is.finite(max_size) || max_size <= 0) max_size <- point_size_multiplier
+  if (!is.finite(min_size) || min_size <= 0) min_size <- max_size / 3
+
+  x_lab <- .pretty_policy_label(policy_vec[1])
+  y_lab <- .pretty_policy_label(policy_vec[2])
+  p_x_axis <- .raw_x_axis_plot(counts$x_levels, policy_vec[1])
+  p_y_axis <- .raw_y_axis_plot(counts$y_levels, policy_vec[2])
+
+  p_raw <- ggplot2::ggplot(heat_df, ggplot2::aes(x = col1, y = col2, color = Freq, size = Freq)) +
+    ggplot2::geom_point() +
+    ggplot2::scale_color_gradient2(
+      midpoint = 0.5 * max_freq,
+      low = low,
+      mid = mid,
+      high = high
+    ) +
+    ggplot2::scale_size_continuous(range = c(min_size, max_size)) +
+    ggplot2::scale_x_discrete(drop = FALSE, expand = ggplot2::expansion(add = 0.5)) +
+    ggplot2::scale_y_discrete(drop = FALSE, expand = ggplot2::expansion(add = 0.5)) +
+    ggplot2::theme(
+      legend.position = "none",
+      panel.border = ggplot2::element_blank(),
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      axis.line = ggplot2::element_line(color = "black", linewidth = 0.4),
+      axis.title.x = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank(),
+      panel.background = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(5.5, 0, 0, 0)
+    )
+    # + ggplot2::coord_equal()
+
+  p_bottom <- ggplot2::ggplot(counts$x_dist, ggplot2::aes(x = score, y = Freq)) +
+    ggplot2::geom_col(width = 0.6, fill = "ivory4", color = "grey35", linewidth = 0.3) +
+    ggplot2::scale_x_discrete(drop = FALSE, expand = ggplot2::expansion(add = 0.5), labels = rep("", length(counts$x_levels))) +
+    ggplot2::scale_y_reverse(expand = c(0, 0)) +
+    ggplot2::labs(x = NULL, y = "Proportion") +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      legend.position = "none",
+      panel.border = ggplot2::element_blank(),
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      axis.line.x = ggplot2::element_line(color = "grey30", linewidth = 0.3),
+      axis.line.y = ggplot2::element_blank(),
+      panel.background = ggplot2::element_blank(),
+      axis.title.x = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(0, 0, 5.5, 0)
+    )
+
+  p_left <- ggplot2::ggplot(counts$y_dist, ggplot2::aes(x = score, y = Freq)) +
+    ggplot2::geom_col(width = 0.6, fill = "ivory4", color = "grey35", linewidth = 0.3) +
+    ggplot2::scale_x_discrete(drop = FALSE, expand = ggplot2::expansion(add = 0.5), labels = rep("", length(counts$y_levels))) +
+    ggplot2::scale_y_reverse(expand = c(0, 0)) +
+    ggplot2::coord_flip() +
+    ggplot2::labs(x = NULL, y = "Proportion") +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      legend.position = "none",
+      panel.border = ggplot2::element_blank(),
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      axis.line.x = ggplot2::element_blank(),
+      axis.line.y = ggplot2::element_line(color = "grey30", linewidth = 0.3),
+      panel.background = ggplot2::element_blank(),
+      axis.title.x = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(5.5, 0, 0, 0)
+    )
+
+  y_lab_grob <- grid::textGrob(
+    y_lab,
+    rot = 90,
+    gp = grid::gpar(fontsize = 16)
+  )
+
+  x_lab_grob <- grid::textGrob(
+    x_lab,
+    gp = grid::gpar(fontsize = .DEFAULT_AXIS_TITLE_SIZE)
+  )
+
+  bottom_center_grob <- gridExtra::arrangeGrob(
+    grobs = list(p_bottom, p_x_axis, x_lab_grob),
+    ncol = 1,
+    heights = c(1.00, 0.22, 0.32)
+  )
+
+  top_grob <- gridExtra::arrangeGrob(
+    grobs = list(y_lab_grob, p_y_axis, p_left, p_raw),
+    ncol = 4,
+    widths = c(0.75, 0.65, 1.2, 5.8)
+  )
+
+  bottom_grob <- gridExtra::arrangeGrob(
+    grobs = list(grid::nullGrob(), grid::nullGrob(), grid::nullGrob(), bottom_center_grob),
+    ncol = 4,
+    widths = c(0.75, 0.65, 1.2, 5.8)
+  )
+
+  g <- gridExtra::arrangeGrob(
+    grobs = list(top_grob, bottom_grob),
+    ncol = 1,
+    heights = c(5.2, 1.4)
+  )
+
+  if (!is.null(title) && nzchar(title)) {
+    g <- gridExtra::arrangeGrob(
+      g,
+      top = grid::textGrob(
+        label = title,
+        x = 0.5,
+        hjust = 0.5,
+        gp = grid::gpar(fontsize = 20, fontface = "bold")
+      )
+    )
+  }
+
+  g
+}
+
