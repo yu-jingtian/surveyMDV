@@ -10,10 +10,31 @@
 .DEFAULT_LOW_COLOR <- "#c6dbef"
 .DEFAULT_MID_COLOR <- "#F4B811"
 .DEFAULT_HIGH_COLOR <- "#CC2929"
+.ACCESSIBLE_LOW_COLOR <- "#F7FBFF"
+.ACCESSIBLE_MID_COLOR <- "#6BAED6"
+.ACCESSIBLE_HIGH_COLOR <- "#08306B"
 
 # ---- utilities ----
 
 .is_null_or_empty <- function(x) is.null(x) || length(x) == 0
+
+.resolve_heat_palette <- function(palette = c("default", "accessible")) {
+  palette <- match.arg(palette)
+
+  if (identical(palette, "default")) {
+    return(list(
+      low = .DEFAULT_LOW_COLOR,
+      mid = .DEFAULT_MID_COLOR,
+      high = .DEFAULT_HIGH_COLOR
+    ))
+  }
+
+  list(
+    low = .ACCESSIBLE_LOW_COLOR,
+    mid = .ACCESSIBLE_MID_COLOR,
+    high = .ACCESSIBLE_HIGH_COLOR
+  )
+}
 
 .resolve_policy_names <- function(model = c("rf", "xgb", "lm", "svr"), policy_x, policy_y) {
   model <- match.arg(model)
@@ -376,8 +397,20 @@
     ggplot2::coord_equal()
 }
 
-.draw_panel <- function(df, policy_vec, scale_spec, breaks = .DEFAULT_HEAT_BREAKS) {
-  .draw_panel_pred(df, policy_vec, scale_spec, breaks = breaks)
+.draw_panel <- function(df, policy_vec, scale_spec,
+                        breaks = .DEFAULT_HEAT_BREAKS,
+                        low = .DEFAULT_LOW_COLOR,
+                        mid = .DEFAULT_MID_COLOR,
+                        high = .DEFAULT_HIGH_COLOR) {
+  .draw_panel_pred(
+    df = df,
+    policy_vec = policy_vec,
+    scale_spec = scale_spec,
+    breaks = breaks,
+    low = low,
+    mid = mid,
+    high = high
+  )
 }
 
 # ---- single heatmap + marginals ----
@@ -853,8 +886,8 @@
       high = high
     ) +
     ggplot2::scale_size_continuous(range = c(min_size, max_size)) +
-    ggplot2::scale_x_discrete(drop = FALSE, expand = ggplot2::expansion(add = 0.5)) +
-    ggplot2::scale_y_discrete(drop = FALSE, expand = ggplot2::expansion(add = 0.5)) +
+    ggplot2::scale_x_discrete(limits = counts$x_levels, drop = FALSE, expand = ggplot2::expansion(add = 0.5)) +
+    ggplot2::scale_y_discrete(limits = counts$y_levels, drop = FALSE, expand = ggplot2::expansion(add = 0.5)) +
     ggplot2::theme(
       legend.position = "none",
       panel.border = ggplot2::element_blank(),
@@ -969,3 +1002,260 @@
   g
 }
 
+
+# ---- raw-score grid helpers ----
+
+.prepare_raw_year_df_with_demo <- function(year) {
+  year <- as.integer(year)
+
+  pol <- get_policy_raw(year = year, cols = NULL)
+  demo <- get_demographics(year = year, cols = NULL)
+
+  merge(pol, demo, by = c("case_id", "year"), all = FALSE)
+}
+
+.raw_score_levels_from_years <- function(df_year_list, policy_name) {
+  vals <- unlist(lapply(df_year_list, function(df) df[[policy_name]]), use.names = FALSE)
+  .raw_score_levels(vals)
+}
+
+.raw_panel_counts <- function(df, policy_vec, x_levels, y_levels) {
+  .check_required_cols(df, policy_vec, context = "raw-score panel drawing")
+
+  ok <- .usable_xy(df, policy_vec)
+  if (!any(ok)) return(NULL)
+
+  fx <- .raw_score_factor(df[[policy_vec[1]]][ok], x_levels)
+  fy <- .raw_score_factor(df[[policy_vec[2]]][ok], y_levels)
+
+  plot_df <- data.frame(col1 = fx, col2 = fy)
+  plot_df <- plot_df[!is.na(plot_df$col1) & !is.na(plot_df$col2), , drop = FALSE]
+  if (nrow(plot_df) == 0) return(NULL)
+
+  heat <- stats::aggregate(
+    list(Freq = rep(1L, nrow(plot_df))),
+    by = list(col1 = plot_df$col1, col2 = plot_df$col2),
+    FUN = sum
+  )
+  heat$Freq <- heat$Freq / sum(heat$Freq)
+  heat$col1 <- factor(heat$col1, levels = x_levels, ordered = TRUE)
+  heat$col2 <- factor(heat$col2, levels = y_levels, ordered = TRUE)
+
+  list(
+    heat = heat,
+    n = nrow(plot_df)
+  )
+}
+
+.compute_raw_scale_spec <- function(df, policy_vec, x_levels, y_levels) {
+  counts <- .raw_panel_counts(df, policy_vec, x_levels, y_levels)
+
+  if (is.null(counts) || nrow(counts$heat) == 0) {
+    return(list(max_prop = NA_real_, total = 0L, empty = TRUE))
+  }
+
+  max_prop <- max(counts$heat$Freq, na.rm = TRUE)
+  if (!is.finite(max_prop) || max_prop <= 0) {
+    return(list(max_prop = NA_real_, total = counts$n, empty = TRUE))
+  }
+
+  list(
+    max_prop = max_prop,
+    total    = counts$n,
+    empty    = FALSE
+  )
+}
+
+.compute_raw_scale_specs <- function(df_year_list, panels,
+                                     policy_vec,
+                                     x_levels,
+                                     y_levels,
+                                     scale = c("across_years", "within_year"),
+                                     scale_ref = c("population", "panel"),
+                                     scale_ref_panel = 1L) {
+  scale <- match.arg(scale, c("across_years", "within_year"))
+  scale_ref <- match.arg(scale_ref, c("population", "panel"))
+
+  n_panels <- length(panels)
+  n_years  <- length(df_year_list)
+
+  specs <- vector("list", n_panels)
+  for (r in seq_len(n_panels)) specs[[r]] <- vector("list", n_years)
+
+  get_ref_df <- function(df_year) {
+    if (scale_ref == "population") return(df_year)
+    idx <- as.integer(scale_ref_panel)
+    if (is.na(idx) || idx < 1 || idx > length(panels)) {
+      stop("Invalid scale reference panel index.", call. = FALSE)
+    }
+    .apply_panel_filter(df_year, panels[[idx]])
+  }
+
+  if (scale == "within_year") {
+    for (c in seq_len(n_years)) {
+      ref_df   <- get_ref_df(df_year_list[[c]])
+      ref_spec <- .compute_raw_scale_spec(ref_df, policy_vec, x_levels, y_levels)
+      for (r in seq_len(n_panels)) specs[[r]][[c]] <- ref_spec
+    }
+    return(specs)
+  }
+
+  ref_specs_by_year <- vector("list", n_years)
+  for (c in seq_len(n_years)) {
+    ref_df <- get_ref_df(df_year_list[[c]])
+    .check_required_cols(ref_df, policy_vec, context = "raw-score scale reference (across years)")
+    ref_specs_by_year[[c]] <- .compute_raw_scale_spec(ref_df, policy_vec, x_levels, y_levels)
+  }
+
+  nonempty <- vapply(ref_specs_by_year, function(s) !is.null(s$empty) && !isTRUE(s$empty), logical(1))
+  if (!any(nonempty)) {
+    global_spec <- list(max_prop = NA_real_, total = 0L, empty = TRUE)
+  } else {
+    max_props <- vapply(ref_specs_by_year[nonempty], function(s) s$max_prop, numeric(1))
+    totals    <- vapply(ref_specs_by_year[nonempty], function(s) s$total,    numeric(1))
+
+    global_spec <- list(
+      max_prop = max(max_props, na.rm = TRUE),
+      total    = as.integer(max(totals, na.rm = TRUE)),
+      empty    = FALSE
+    )
+  }
+
+  for (c in seq_len(n_years)) {
+    for (r in seq_len(n_panels)) specs[[r]][[c]] <- global_spec
+  }
+
+  specs
+}
+
+.compute_raw_grid_scale <- function(df_year_list, panels, policy_vec, x_levels, y_levels) {
+  max_prop <- NA_real_
+  any_nonempty <- FALSE
+
+  for (df_year in df_year_list) {
+    for (panel in panels) {
+      df_panel <- .apply_panel_filter(df_year, panel)
+      counts <- .raw_panel_counts(df_panel, policy_vec, x_levels, y_levels)
+      if (!is.null(counts) && nrow(counts$heat) > 0) {
+        panel_max <- max(counts$heat$Freq, na.rm = TRUE)
+        if (is.finite(panel_max)) {
+          max_prop <- max(max_prop, panel_max, na.rm = TRUE)
+          any_nonempty <- TRUE
+        }
+      }
+    }
+  }
+
+  if (!any_nonempty || !is.finite(max_prop) || max_prop <= 0) {
+    return(list(max_prop = NA_real_, empty = TRUE))
+  }
+
+  list(max_prop = max_prop, empty = FALSE)
+}
+
+.blank_raw_panel <- function(x_levels, y_levels) {
+  empty_df <- data.frame(
+    col1 = factor(character(0), levels = x_levels, ordered = TRUE),
+    col2 = factor(character(0), levels = y_levels, ordered = TRUE)
+  )
+
+  ggplot2::ggplot(empty_df, ggplot2::aes(x = col1, y = col2)) +
+    ggplot2::geom_blank() +
+    ggplot2::scale_x_discrete(limits = x_levels, drop = FALSE, expand = ggplot2::expansion(add = 0.5)) +
+    ggplot2::scale_y_discrete(limits = y_levels, drop = FALSE, expand = ggplot2::expansion(add = 0.5)) +
+    ggplot2::theme(
+      legend.position = "none",
+      panel.border = ggplot2::element_blank(),
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      axis.line = ggplot2::element_line(color = "black", linewidth = 0.4),
+      axis.title.x = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank(),
+      panel.background = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(5.5, 0, 0, 0)
+    ) +
+    ggplot2::coord_equal()
+}
+
+.draw_raw_grid_panel <- function(df,
+                                 policy_vec,
+                                 x_levels,
+                                 y_levels,
+                                 scale_spec,
+                                 low = .DEFAULT_LOW_COLOR,
+                                 mid = .DEFAULT_MID_COLOR,
+                                 high = .DEFAULT_HIGH_COLOR,
+                                 point_size_range = c(0.8, 6.0)) {
+  .check_required_cols(df, policy_vec, context = "raw-score grid panel drawing")
+
+  counts <- .raw_panel_counts(df, policy_vec, x_levels, y_levels)
+  if (is.null(counts)) return(.blank_raw_panel(x_levels, y_levels))
+  if (!is.null(scale_spec$empty) && isTRUE(scale_spec$empty)) return(.blank_raw_panel(x_levels, y_levels))
+  if (is.null(scale_spec$max_prop) || is.na(scale_spec$max_prop) || scale_spec$max_prop <= 0) {
+    return(.blank_raw_panel(x_levels, y_levels))
+  }
+
+  point_size_range <- as.numeric(point_size_range)
+  if (length(point_size_range) != 2 || any(!is.finite(point_size_range)) || any(point_size_range <= 0)) {
+    stop("`point_size_range` must be a positive numeric vector of length 2.", call. = FALSE)
+  }
+  point_size_range <- sort(point_size_range)
+
+  heat_df <- counts$heat
+
+  # Use the same shared reference scale as the predicted-score heatmaps, but do
+  # not let raw cells outside the reference range be dropped by ggplot2.
+  # This can happen when the scale reference is the population/first panel but a
+  # subgroup cell has a larger observed joint proportion. We cap the plotting
+  # value for both color and size while keeping the original Freq unchanged.
+  heat_df$Freq_plot <- pmin(pmax(as.numeric(heat_df$Freq), 0), scale_spec$max_prop)
+  heat_df <- heat_df[is.finite(heat_df$Freq_plot), , drop = FALSE]
+  if (nrow(heat_df) == 0) return(.blank_raw_panel(x_levels, y_levels))
+
+  ggplot2::ggplot(heat_df, ggplot2::aes(x = col1, y = col2, color = Freq_plot, size = Freq_plot)) +
+    ggplot2::geom_point() +
+    ggplot2::scale_color_gradient2(
+      midpoint = 0.5 * scale_spec$max_prop,
+      limits = c(0, scale_spec$max_prop),
+      low = low,
+      mid = mid,
+      high = high
+    ) +
+    ggplot2::scale_size_continuous(
+      limits = c(0, scale_spec$max_prop),
+      range = point_size_range
+    ) +
+    ggplot2::scale_x_discrete(limits = x_levels, drop = FALSE, expand = ggplot2::expansion(add = 0.5)) +
+    ggplot2::scale_y_discrete(limits = y_levels, drop = FALSE, expand = ggplot2::expansion(add = 0.5)) +
+    ggplot2::theme(
+      legend.position = "none",
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      axis.line = ggplot2::element_line(color = "black", linewidth = 0.4),
+      axis.title.x = ggplot2::element_blank(),
+      axis.title.y = ggplot2::element_blank(),
+      axis.text.x = ggplot2::element_blank(),
+      axis.ticks.x = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks.y = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(5.5, 0, 0, 0),
+      panel.background = ggplot2::element_rect(fill = "grey96", colour = NA),
+      plot.background  = ggplot2::element_rect(fill = "white", colour = NA),
+      panel.border     = ggplot2::element_rect(colour = "grey85", fill = NA, linewidth = 0.4)
+    ) +
+    ggplot2::coord_equal()
+}
+
+.raw_axis_npc_positions <- function(levels, targets = c(0, 0.5, 1)) {
+  n <- length(levels)
+  if (n == 0) return(rep(NA_real_, length(targets)))
+
+  pos <- .raw_target_positions(levels = levels, targets = targets)
+  out <- (pos - 0.5) / n
+  out[!is.finite(out)] <- NA_real_
+  pmin(pmax(out, 0), 1)
+}

@@ -11,7 +11,8 @@ plot_policy_heat_single(
   model = c("rf", "xgb", "lm", "svr"),
   group = "population",
   subgroup = NULL,
-  title = NULL
+  title = NULL,
+  palette = c("default", "accessible")
 )
 }
 \arguments{
@@ -32,6 +33,10 @@ plot_policy_heat_single(
 \code{"female"}, and \code{"male"}.}
 
 \item{title}{Optional custom title. If \code{NULL}, a default title is used.}
+
+\item{palette}{Color palette. Use \code{"default"} for the original
+blue--yellow--red gradient or \code{"accessible"} for a color-vision-accessible
+light-to-dark blue gradient.}
 }
 \value{
 A grid grob.

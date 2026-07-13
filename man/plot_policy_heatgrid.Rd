@@ -9,7 +9,8 @@ plot_policy_heatgrid(
   policy_x,
   policy_y,
   model = c("rf", "xgb", "lm", "svr"),
-  panels = panels_partisan()
+  panels = panels_partisan(),
+  palette = c("default", "accessible")
 )
 }
 \arguments{
@@ -20,6 +21,10 @@ plot_policy_heatgrid(
 \item{model}{Prediction model used for the plotted scores.}
 
 \item{panels}{Panel specification list, such as \code{panels_partisan()}.}
+
+\item{palette}{Color palette. Use \code{"default"} for the original
+blue--yellow--red gradient or \code{"accessible"} for a color-vision-accessible
+light-to-dark blue gradient.}
 }
 \value{
 A grob containing the heatmap grid and shared policy axes.

@@ -145,6 +145,20 @@ p5 <- plot_policy_subgroup_grid(
 p5
 ```
 
+```r
+# 6) Single policy heatmap with a color-vision-accessible palette
+p6 <- plot_policy_heat_single(
+  year = 2019,
+  policy_x = "immig",
+  policy_y = "trade",
+  model = "rf",
+  group = "population",
+  palette = "accessible"
+)
+
+p6
+```
+
 ---
 
 ## 3. Project Highlights

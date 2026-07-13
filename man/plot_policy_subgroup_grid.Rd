@@ -9,7 +9,8 @@ plot_policy_subgroup_grid(
   policy_x,
   policy_y,
   model = c("rf", "xgb", "lm", "svr"),
-  group = c("population", "republican", "independent", "democrat")
+  group = c("population", "republican", "independent", "democrat"),
+  palette = c("default", "accessible")
 )
 }
 \arguments{
@@ -21,6 +22,10 @@ plot_policy_subgroup_grid(
 
 \item{group}{Main group to decompose. One of \code{"population"},
 \code{"republican"}, \code{"independent"}, or \code{"democrat"}.}
+
+\item{palette}{Color palette. Use \code{"default"} for the original
+blue--yellow--red gradient or \code{"accessible"} for a color-vision-accessible
+light-to-dark blue gradient.}
 }
 \value{
 A grob containing the heatmap grid and shared policy axes.

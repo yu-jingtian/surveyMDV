@@ -9,7 +9,8 @@ plot_policy_raw_single(
   policy_x,
   policy_y,
   title = NULL,
-  point_size_multiplier = 80
+  point_size_multiplier = 80,
+  palette = c("default", "accessible")
 )
 }
 \arguments{
@@ -24,6 +25,10 @@ plot_policy_raw_single(
 \item{point_size_multiplier}{Positive numeric multiplier controlling the
 point-size scale in the central raw frequency-scatter panel. Larger values
 make the dots larger.}
+
+\item{palette}{Color palette. Use \code{"default"} for the original
+blue--yellow--red gradient or \code{"accessible"} for a color-vision-accessible
+light-to-dark blue gradient.}
 }
 \value{
 A grid grob.
